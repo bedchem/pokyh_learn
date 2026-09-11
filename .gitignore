@@ -1,0 +1,19 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next/
+/out/
+
+# local environment and secrets
+.env*
+!.env.example
+
+# diagnostics
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# local editor state
+.idea/
+.vscode/

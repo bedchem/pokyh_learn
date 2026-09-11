@@ -1,0 +1,38 @@
+import { ArrowLeft, CheckCircle2, ChevronRight, ListChecks, Volume2 } from 'lucide-react';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+
+import { AppShell } from '@/components/layout/app-shell';
+import { LessonProgressSync } from '@/components/learn/lesson-progress-sync';
+import type { CourseSection } from '@/lib/types';
+import { getCourse } from '@/lib/server/data';
+import { getAccessToken } from '@/lib/server/session';
+
+export const dynamic = 'force-dynamic';
+
+function readableContent(content: CourseSection['content']): string[] {
+  if (typeof content === 'string') return [content];
+  if (!content || typeof content !== 'object' || Array.isArray(content)) return [];
+  const record = content as Record<string, unknown>;
+  const directKeys = ['intro', 'body', 'text', 'instructions', 'example'];
+  const direct = directKeys.flatMap((key) => typeof record[key] === 'string' ? [record[key] as string] : []);
+  const paragraphs = Array.isArray(record.paragraphs)
+    ? record.paragraphs.filter((value): value is string => typeof value === 'string')
+    : [];
+  return [...direct, ...paragraphs].filter((value) => value.trim().length > 0).slice(0, 12);
+}
+
+export default async function LessonPage({ params }: { params: Promise<{ slug: string; unit: string }> }) {
+  const { slug, unit } = await params;
+  const course = await getCourse(slug, await getAccessToken());
+  if (!course || !course.isEnrolled) notFound();
+  const sections = course.sections || [];
+  const sectionIndex = sections.findIndex((section) => section.id === unit);
+  if (sectionIndex < 0) notFound();
+  const section = sections[sectionIndex];
+  const content = readableContent(section.content);
+  const next = sections[sectionIndex + 1];
+  const progress = Math.round(((sectionIndex + 1) / Math.max(1, sections.length)) * 100);
+
+  return <AppShell><LessonProgressSync courseId={course.id} completedSections={sectionIndex + 1} totalSections={sections.length} /><div className="page-wrap lesson-page"><Link className="back-link" href={`/courses/${course.slug}`}><ArrowLeft size={16} /> Zur Kursübersicht</Link><div className="lesson-layout"><article className="lesson-content panel"><p className="eyebrow">{course.title} · {section.type.toLocaleLowerCase('de-DE')}</p><h1>{section.title}</h1><p className="lesson-intro">{section.summary || 'Dieser Abschnitt wird durch den Kursautor serverseitig gepflegt.'}</p>{content.length ? <section className="lesson-authored-content">{content.map((paragraph, index) => <p key={`${section.id}-${index}`} lang={course.language.toLocaleLowerCase('de-DE').includes('ital') ? 'it' : course.language.toLocaleLowerCase('de-DE').includes('engl') ? 'en' : undefined}>{paragraph}</p>)}</section> : <section className="lesson-example"><span><Volume2 size={17} /> Eigener Inhalt</span><p>Der Kursautor hat für diesen Abschnitt noch keinen lesbaren Inhalt veröffentlicht. Sobald er ergänzt wird, erscheint er hier direkt aus dem Backend.</p></section>}<div className="lesson-footer"><Link href={`/courses/${course.slug}`} className="button button--plain">Später fortsetzen</Link>{next ? <Link href={`/courses/${course.slug}/learn/${next.id}`} className="button button--dark">Weiter <ChevronRight size={16} /></Link> : <Link href="/practice" className="button button--dark">Wiederholen <ChevronRight size={16} /></Link>}</div></article><aside className="lesson-sidebar"><div className="lesson-progress"><span><CheckCircle2 size={16} /> Abschnitt {sectionIndex + 1} von {sections.length}</span><div className="progress-track"><i style={{ width: `${progress}%` }} /></div></div><div className="panel"><p className="section-kicker"><ListChecks size={15} /> Dieser Abschnitt</p><h2>{section.type === 'VOCABULARY' ? 'Wörter im Kontext' : section.type === 'GRAMMAR' ? 'Regel anwenden' : section.type === 'QUIZ' ? 'Wissen abrufen' : 'Lerninhalt'}</h2><ul><li>{section.summary || 'Eigener Kursinhalt'}</li><li>Fortschritt bleibt serverseitig gespeichert</li></ul></div></aside></div></div></AppShell>;
+}
