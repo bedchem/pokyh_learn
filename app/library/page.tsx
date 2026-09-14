@@ -1,7 +1,11 @@
-import { Download, FileJson2, FolderLock, Upload } from 'lucide-react';
-
 import { AppShell } from '@/components/layout/app-shell';
+import { Text } from '@/components/i18n/text';
+import { LibraryTransfer } from '@/components/learn/library-transfer';
+import { requireLearnUser } from '@/lib/server/learn-admin';
 
-export default function LibraryPage() {
-  return <AppShell><div className="page-wrap"><section className="page-heading"><div><p className="eyebrow">Deine Inhalte</p><h1>Bibliothek & Datenaustausch.</h1><p className="page-lead">Private Inhalte bleiben dir zugeordnet. Imports und Exports folgen einem versionierten, serverseitig geprüften Format.</p></div></section><section className="library-grid"><article className="panel library-card"><span className="icon-orb icon-orb--violet"><FileJson2 size={20} /></span><h2>JSON exportieren</h2><p>Exportiere nur Inhalte und Lernstände, für die du auf dem Server ausdrücklich berechtigt bist.</p><button className="button button--dark"><Download size={16} /> Export vorbereiten</button></article><article className="panel library-card"><span className="icon-orb icon-orb--rose"><Upload size={20} /></span><h2>JSON importieren</h2><p>Prüfe zuerst Format, Version, Besitz und Referenzen. Ein Import kann niemals Rollen oder Teamrechte verändern.</p><button className="button button--soft"><Upload size={16} /> Import auswählen</button></article><article className="panel library-card"><span className="icon-orb icon-orb--sun"><FolderLock size={20} /></span><h2>Private Entwürfe</h2><p>Eigene Entwürfe sind nur für dich sichtbar, bis du sie bewusst freigibst oder in einen Kurs überführst.</p><a className="text-link" href="/create/course">Entwurf erstellen</a></article></section></div></AppShell>;
+export const dynamic = 'force-dynamic';
+
+export default async function LibraryPage() {
+  const { identity } = await requireLearnUser('/library');
+  return <AppShell initialIdentity={identity}><div className="page-wrap"><section className="page-heading"><div><p className="eyebrow"><Text id="library.eyebrow" /></p><h1><Text id="library.title" /></h1><p className="page-lead"><Text id="library.body" /></p></div></section><LibraryTransfer /></div></AppShell>;
 }

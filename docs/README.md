@@ -16,9 +16,11 @@ second source of truth.
 | Product or engineering guardrail | [Repository contract](../CLAUDE.md) | What must remain true for security, ownership, caching, deployment, and delivery. |
 | Visual or interaction change | [Design system](./design-system.md) and [visual context](../UI/CLAUDE.md) | How the experience should look, behave, and adapt across device sizes. |
 | Data, security, cache, or rollout question | [Architecture](./architecture.md) | System boundaries, authority, lifecycle, performance, and operations. |
-| BFF or backend integration | [API contract](./api-contract.md) | The currently mounted `/learn` endpoints, payload expectations, and unavailable capabilities. |
+| BFF or backend integration | [API contract](./api-contract.md) | The currently mounted `/learn` endpoints, payload expectations, and intentionally unavailable capabilities. |
 | Why a trade-off was made | [Architecture decisions](./decisions.md) | Durable decisions and their consequences. |
 | Local setup or release check | [Project README](../README.md) | Environment variables, commands, and verification steps. |
+| WebUntis/Italy production readiness | [Legal readiness record](./legal-readiness.md) | The privacy, authorisation and operating checks that must be completed outside code before production sign-in. |
+| What changed in a delivery | [Worklog](./worklog/README.md) | Chronological decisions, verification evidence, and release status without secrets. |
 
 ## Source-of-truth order
 
@@ -50,7 +52,7 @@ Authoring
   Personal course -> sections/vocabulary -> explicit sharing or team access
 
 Administration
-  Existing Pokyh administrator -> scoped course-access grant -> audit trail
+  Existing Pokyh administrator -> separate Learn console -> scoped course-access grant
 ```
 
 The central learning loop is deliberately simple: help a person choose a
@@ -66,12 +68,12 @@ details belong in [the API contract](./api-contract.md).
 
 | Area | State | Notes |
 | --- | --- | --- |
-| Published catalogue, profile, dashboard, courses, enrollments, and progress | Mounted | Served by the backend `/learn` router through the same-origin BFF. |
-| Vocabulary CRUD, review queues, and idempotent quiz attempts | Mounted | Grading and review scheduling happen on the server. |
-| Teams, direct membership assignment, and administrator course grants | Mounted | UI must show only server-confirmed capabilities. |
+| Published catalogue, profile, dashboard, courses, enrollments, and explicit section progress | Mounted | Served by the backend `/learn` router through the same-origin BFF. Progress is derived from completed sections, not browser percentages. |
+| Vocabulary CRUD, editorial answer approval, optional dictionary verification, review queues, and idempotent quiz attempts | Mounted | Grading and review scheduling happen on the server; the dictionary is only an explicit, configured suggestion. |
+| Course studio, section editing/reordering, personal JSON import/export, teams, direct membership assignment, and administrator course grants | Mounted | The studio and Learn administration show only server-confirmed capabilities. Imports always produce private drafts. |
+| Separate Learn administrator console | Mounted | `/admin` in the Learn frontend uses `/learn/admin/*`; it does not mix with the existing Pokyh administration UI. |
 | School-year retention for Learn profiles | Implemented | Learn-bearing accounts are retained during school-year rollover; regression coverage remains a release check. |
-| Dictionary suggestions/verification, accepted-answer records, and authoring revisions | Planned hardening | Do not advertise automatic validation or provider-backed results until an endpoint and policy are deployed. |
-| JSON import/export, invitation acceptance, full team/course management, settings, audit API | Not mounted | Keep the related controls unavailable until the backend contract is implemented and tested. |
+| Invitation acceptance/removal, ownership transfer, platform Learn backup/restore, settings and audit-feed UI | Not mounted | Keep these controls unavailable until their backend contracts and tests exist. |
 | Redis-backed distributed cache/work queues | Deployment follow-up | MySQL remains authoritative; cache loss must not lose learning data. |
 
 ## How to change the documentation
@@ -85,6 +87,7 @@ Update the smallest set of documents that expresses the change accurately:
 | Product scope, role rule, privacy rule, or release condition | `CLAUDE.md`, then the affected detailed document. |
 | Tokens, layout, component behavior, responsive state, or accessibility | `docs/design-system.md` and `UI/CLAUDE.md`. |
 | Environment value or operator configuration | `.env.example`, `README.md`, and the affected architecture/API section. |
+| Material implementation, validation, visual check, release, or incident step | a dated entry in `docs/worklog/` plus the affected contract document. |
 
 Write concrete facts and links rather than vague promises. Use status language
 such as **mounted**, **implemented**, **planned hardening**, or **not mounted**
@@ -106,6 +109,8 @@ Before merging a behavior change, verify that:
   without color or motion alone; and
 - `npm run lint`, `npm run typecheck`, and `npm run build` are included in the
   release verification described in the project README.
+- the dated worklog records the intent, outcome, verification, known limits,
+  and release state without including private or secret material.
 
 ## Related files
 
@@ -115,3 +120,5 @@ Before merging a behavior change, verify that:
 - [Architecture](./architecture.md)
 - [API contract](./api-contract.md)
 - [Architecture decisions](./decisions.md)
+- [Legal readiness record](./legal-readiness.md)
+- [Worklog protocol](./worklog/README.md)

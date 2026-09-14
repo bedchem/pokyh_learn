@@ -1,0 +1,13 @@
+# Keep local build artifacts, source-control metadata, and every environment
+# file out of the Docker build context. Runtime configuration is mounted by
+# Compose through env_file instead.
+.git
+.github
+.next
+node_modules
+.env
+.env.*
+*.log
+*.tsbuildinfo
+.DS_Store
+coverage

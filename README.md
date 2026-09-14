@@ -25,7 +25,7 @@ Browser
   -> learn.pokyh.com (Next.js)
   -> same-origin BFF route handlers
   -> api.pokyh.com (existing Pokyh backend)
-  -> MySQL / optional Redis cache layer
+  -> MySQL (durable) + optional private analytics cache (Redis)
 ```
 
 The browser never receives the backend API key. Protected user tokens are
@@ -59,6 +59,8 @@ mode. It is disabled by default and must never be enabled in production.
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | yes | public canonical Learn URL |
+| `PORT` | optional | HTTP listener port; Compose defaults to `3005` |
+| `LEARN_BIND_ADDRESS` | optional | Docker host bind address; defaults to loopback (`127.0.0.1`) |
 | `API_BACKEND_URL` | yes | server-only Pokyh API URL |
 | `API_BACKEND_KEY` | yes | server-only API key for the backend gate |
 | `LEARN_SESSION_COOKIE_NAME` | yes | HttpOnly access-session cookie name |
@@ -68,9 +70,73 @@ mode. It is disabled by default and must never be enabled in production.
 | `LEARN_COOKIE_DOMAIN` | optional | cookie domain scope |
 | `LEARN_API_PREFIX` | yes | backend Learn API path prefix |
 | `LEARN_API_TIMEOUT_MS` | yes | BFF request deadline |
+| `LEARN_BFF_BODY_LIMIT_BYTES` | yes | maximum ordinary JSON body accepted by the public BFF |
+| `LEARN_BFF_IMPORT_BODY_LIMIT_BYTES` | yes | maximum JSON library-import body accepted by the public BFF |
+| `LEARN_PRIVACY_NOTICE_URL` | yes | runtime-read HTTPS Pokyh Learn privacy notice URL |
+| `LEARN_PRIVACY_NOTICE_VERSION` | yes | runtime-read notice version, matched by the backend login gate |
 | `NEXT_PUBLIC_LEARN_DEMO_MODE` | local only | renders non-production presentation data |
 
+`LEARN_PRIVACY_NOTICE_URL` and `LEARN_PRIVACY_NOTICE_VERSION` are required for
+the WebUntis sign-in form. They are public values but are read server-side at
+request time, so a Compose deployment can change a notice version without
+baking it into the image. They must match the backend's
+`LEARN_PRIVACY_NOTICE_*` configuration exactly. A production login remains
+intentionally unavailable until the backend also has its documented,
+non-secret WebUntis authorisation reference. Read
+[the legal readiness record](./docs/legal-readiness.md) before enabling the
+feature; configuration alone does not create a legal basis.
+
 Never commit `.env.local`, API keys, tokens, passwords, or provider keys.
+
+## Docker deployment
+
+The Compose configuration runs **only this Next.js frontend**. It does not
+start, replace, or network-link a Pokyh backend; production traffic continues
+from the same-origin BFF to the separately deployed `api.pokyh.com` configured
+in `API_BACKEND_URL`.
+
+```bash
+cp .env.example .env
+# Set API_BACKEND_KEY and the production values in .env.
+docker compose --env-file .env up --build -d
+```
+
+By default the service listens at `http://127.0.0.1:3005`. Keep that loopback
+binding and terminate TLS in a reverse proxy for `learn.pokyh.com`. If a
+different listener is intentional, set both values in the selected env file:
+
+```dotenv
+PORT=3005
+LEARN_BIND_ADDRESS=127.0.0.1
+```
+
+Compose reads `.env` by default. To use a separately managed runtime file
+without changing the project file, select it for both Compose interpolation and
+the container's `env_file` input. This keeps a non-default `PORT` and the
+runtime configuration in the same private file:
+
+```bash
+LEARN_ENV_FILE=/secure/path/learn.env \
+  docker compose --env-file /secure/path/learn.env up --build -d
+```
+
+The image contains no `.env` files and accepts secrets only at container
+startup. The health endpoint at `/api/health` checks local configuration only;
+it intentionally does not make an upstream API request.
+
+### Scrolling and motion
+
+The frontend bundles Lenis from the local dependency lockfile; it does not load
+scroll code from a CDN. Lenis enhances pointer-wheel scrolling only when the
+learner has not requested reduced motion. Native browser scrolling remains the
+baseline: touch scrolling is not synchronized, anchor links, keyboard movement,
+and focus behavior must remain usable if the enhancement is unavailable.
+
+Dialogs, form controls, popovers, and nested interactive scroll regions use
+`data-lenis-prevent` so they retain native scrolling. Do not make a learning
+action, saving, feedback, or navigation depend on a scroll animation. Test
+reduced-motion, keyboard, touch, focus, anchors, and nested scrolling whenever
+this behavior changes.
 
 ## Commands
 
@@ -89,9 +155,13 @@ configuration and provide the Learn routes defined in `docs/api-contract.md`.
 The server remains the authority for roles, content visibility, course access,
 team membership, grading, review scheduling, imports, and exports.
 
-MySQL is the durable store. Redis should be introduced as a configured,
-failure-safe deployment dependency before multi-instance cache/idempotency or
-distributed review scheduling is enabled.
+MySQL is the durable store. The current backend Compose stack starts an
+internal Redis service only for an optional private, course-specific analytics
+response cache after access has been checked. It stores no raw answers,
+credentials, permissions, or durable state and falls back to MySQL when absent.
+The Learn frontend has no Redis credentials and never connects to Redis. Queue,
+distributed-idempotency, and broader-cache claims remain out of scope until
+separately implemented and reviewed.
 
 ## Verification and release
 
@@ -115,3 +185,5 @@ the deterministic frontend checks for pushes and pull requests.
 - [`docs/api-contract.md`](./docs/api-contract.md) — BFF/backend API contract
 - [`docs/decisions.md`](./docs/decisions.md) — key product and technical
   decisions
+- [`docs/legal-readiness.md`](./docs/legal-readiness.md) — operational
+  WebUntis/Italy production gate and review checklist

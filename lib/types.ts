@@ -38,15 +38,54 @@ export interface Course {
   sections?: CourseSection[];
 }
 
+// First-party analytics are deliberately count-only. Raw quiz answers and
+// answer keys stay out of this frontend contract.
+export interface LearningAnalytics {
+  range: '7d' | '28d' | '90d';
+  timezone: string;
+  dataAvailableSince: string | null;
+  totals: {
+    attempts: number;
+    answers: number;
+    correctAnswers: number;
+    accuracyPercent: number | null;
+    activeDays: number;
+    streakDays: number;
+  };
+  days: Array<{
+    dayKey: string;
+    attempts: number;
+    answers: number;
+    correctAnswers: number;
+  }>;
+  queues: {
+    due: number;
+    wrong: number;
+    fresh: number;
+    nextDueAt: string | null;
+  };
+  recommendation: {
+    kind: 'due' | 'wrong' | 'new' | 'continue' | 'none';
+    count: number;
+    href: string;
+  };
+  courses: Array<{
+    courseId: string;
+    slug: string;
+    title: string;
+    attempts: number;
+    answers: number;
+    correctAnswers: number;
+    accuracyPercent: number | null;
+  }>;
+}
+
 export interface DashboardData {
   displayName: string;
-  streakDays: number;
-  weeklyGoal: number;
-  weeklyGoalProgress: number;
-  dueReviews: number;
-  mistakesToReview: number;
-  minutesThisWeek: number;
-  progressSeries: Array<{ label: string; value: number }>;
+  // This is a learner preference, not observed time-tracking. The UI must not
+  // present it as a measured number of minutes.
+  dailyGoalMinutes: number;
+  analytics: LearningAnalytics;
   activeCourses: Course[];
   reviewCards: Array<{
     id: string;
@@ -71,6 +110,7 @@ export interface VocabularyItem {
   dueAt?: string;
   validation?: 'verified' | 'pending' | 'manual';
   readyForQuiz: boolean;
+  canEdit?: boolean;
 }
 
 export interface ReviewQuestion {

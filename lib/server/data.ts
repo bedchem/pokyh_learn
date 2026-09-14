@@ -1,9 +1,10 @@
 import 'server-only';
 
 import { demoCourses, demoDashboard, demoQuestions, demoTeams, demoVocabulary } from '@/lib/demo-data';
+import type { Locale, ThemeMode } from '@/lib/i18n';
 import { backendFetch } from '@/lib/server/backend';
 import { getServerConfig, isDemoMode } from '@/lib/server/config';
-import type { Course, CourseSection, DashboardData, ReviewKind, ReviewQuestion, Team, VocabularyItem } from '@/lib/types';
+import type { Course, CourseSection, DashboardData, LearningAnalytics, ReviewKind, ReviewQuestion, Team, VocabularyItem } from '@/lib/types';
 
 type BackendSection = {
   id: string;
@@ -27,6 +28,7 @@ type BackendCourse = {
   status?: string;
   updatedAt?: string;
   sections?: BackendSection[];
+  permissions?: { canEdit?: boolean; canManage?: boolean };
   _count?: { sections?: number; vocabulary?: number; enrollments?: number };
 };
 
@@ -47,6 +49,7 @@ type BackendVocabulary = {
   partOfSpeech?: string;
   notes?: string;
   verificationStatus?: string;
+  canEdit?: boolean;
   contextSentence?: string;
   readyForQuiz?: boolean;
 };
@@ -59,6 +62,43 @@ type BackendReview = {
   sourceLanguage: string;
   targetLanguage: string;
   review?: { lastWasCorrect?: boolean } | null;
+};
+
+export type LearnAdminOverview = {
+  stats: {
+    courseCount: number;
+    draftCount: number;
+    publishedCount: number;
+    enrollmentCount: number;
+    vocabularyCount: number;
+  };
+  runtime: {
+    webUntisOnly: boolean;
+    dictionary: { enabled: boolean; provider: string; allowedPairs: string[] };
+    legalGate: { enabled: boolean; ready: boolean; privacyNoticeVersion: string | null };
+  };
+  courses: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    summary: string;
+    subject: string;
+    language: string;
+    level: string;
+    visibility: string;
+    status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+    createdBy: string;
+    updatedAt: string;
+    creator: { username: string } | null;
+    team: { id: string; name: string } | null;
+    _count: { sections: number; vocabulary: number; enrollments: number; accessGrants: number };
+    accessGrants: Array<{
+      stableUid: string;
+      permission: 'VIEW' | 'EDIT' | 'MANAGE';
+      updatedAt: string;
+      user: { username: string; isUntisUser: boolean } | null;
+    }>;
+  }>;
 };
 
 function pathFor(segment: string) {
@@ -74,7 +114,7 @@ function accentFor(value: string) {
 
 function asVisibility(value?: string): Course['visibility'] {
   const normalized = value?.toLocaleLowerCase('en-US');
-  return normalized === 'team' || normalized === 'private' ? normalized : 'public';
+  return normalized === 'public' || normalized === 'team' ? normalized : 'private';
 }
 
 function asState(value?: string): Course['state'] {
@@ -150,6 +190,7 @@ function mapVocabulary(entry: BackendVocabulary): VocabularyItem {
     state: verification === 'verified' ? 'learning' : 'new',
     validation: verification,
     readyForQuiz: Boolean(entry.readyForQuiz),
+    canEdit: Boolean(entry.canEdit),
   };
 }
 
@@ -175,7 +216,7 @@ async function getMyCourses(token: string): Promise<Course[]> {
     token,
     cache: 'no-store',
   });
-  return payload.courses.map((course) => mapCourse(course, course.enrollments?.[0]));
+  return payload.courses.map((course) => mapCourse(course, course.enrollments?.[0], course.permissions));
 }
 
 async function getQuestionQueue(token: string, scope: 'WRONG' | 'DUE' | 'NEW', courseTitles: Map<string, string>) {
@@ -187,18 +228,22 @@ async function getQuestionQueue(token: string, scope: 'WRONG' | 'DUE' | 'NEW', c
 }
 
 export async function getCatalog(): Promise<Course[]> {
-  if (isDemoMode()) return demoCourses;
+  if (isDemoMode()) return demoCourses.filter((course) => course.visibility === 'public' && course.state === 'active');
   const payload = await backendFetch<{ courses: BackendCourse[] }>(pathFor('/catalog'), {
     next: { revalidate: 60, tags: ['learn-catalog'] },
   });
-  return payload.courses.map((course) => mapCourse(course));
+  // Fail closed in the presentation layer as a defence-in-depth measure. The
+  // backend catalog endpoint applies the same predicate authoritatively.
+  return payload.courses
+    .filter((course) => course.visibility?.toLocaleUpperCase('en-US') === 'PUBLIC' && course.status?.toLocaleUpperCase('en-US') === 'PUBLISHED')
+    .map((course) => mapCourse(course));
 }
 
 export async function getCourse(slug: string, token?: string | null): Promise<Course | null> {
   if (isDemoMode()) return demoCourses.find((course) => course.slug === slug) ?? null;
 
-  try {
-    if (token) {
+  if (token) {
+    try {
       const courses = await getMyCourses(token);
       const ownCourse = courses.find((course) => course.slug === slug);
       if (ownCourse) {
@@ -208,8 +253,13 @@ export async function getCourse(slug: string, token?: string | null): Promise<Co
         });
         return mapCourse(payload.course, payload.enrollment, payload.permissions);
       }
+    } catch {
+      // A stale session must not make a public course disappear. Continue with
+      // the public, backend-authorized catalogue lookup below.
     }
+  }
 
+  try {
     const payload = await backendFetch<{ course: BackendCourse }>(pathFor(`/catalog/${encodeURIComponent(slug)}`), {
       next: { revalidate: 60, tags: [`learn-course-${slug}`] },
     });
@@ -226,7 +276,7 @@ export async function getDashboard(token?: string | null): Promise<DashboardData
   type DashboardPayload = {
     profile: { dailyGoalMinutes: number; dailyStreak: number };
     stats: { dueReviewCount: number };
-    recentAttempts: Array<{ totalQuestions: number }>;
+    analytics: LearningAnalytics;
     courses: Array<{ status: string; progressPercent: number; completedSections: number; lastOpenedAt: string | null; course: BackendCourse }>;
   };
   const [me, dashboard] = await Promise.all([
@@ -236,19 +286,10 @@ export async function getDashboard(token?: string | null): Promise<DashboardData
   const activeCourses = dashboard.courses.map((entry) => mapCourse(entry.course, entry));
   const courseTitles = new Map(activeCourses.map((course) => [course.id, course.title]));
   const wrongQuestions = await getQuestionQueue(token, 'WRONG', courseTitles).catch(() => []);
-  const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  const todayIndex = (new Date().getDay() + 6) % 7;
-  const answeredToday = dashboard.recentAttempts.reduce((total, attempt) => total + attempt.totalQuestions, 0);
-
   return {
     displayName: me.user.username,
-    streakDays: dashboard.profile.dailyStreak,
-    weeklyGoal: Math.max(1, dashboard.profile.dailyGoalMinutes),
-    weeklyGoalProgress: Math.min(dashboard.profile.dailyGoalMinutes, answeredToday),
-    dueReviews: dashboard.stats.dueReviewCount,
-    mistakesToReview: wrongQuestions.length,
-    minutesThisWeek: answeredToday,
-    progressSeries: days.map((label, index) => ({ label, value: index === todayIndex ? answeredToday : 0 })),
+    dailyGoalMinutes: dashboard.profile.dailyGoalMinutes,
+    analytics: dashboard.analytics,
     activeCourses,
     reviewCards: wrongQuestions.slice(0, 3).map((question) => ({
       id: question.id,
@@ -274,11 +315,17 @@ export async function getVocabulary(token?: string | null, courseId?: string): P
   return entries.flat();
 }
 
-export async function getReviewQuestions(token?: string | null): Promise<ReviewQuestion[]> {
+export async function getReviewQuestions(
+  token?: string | null,
+  forceScope?: 'WRONG' | 'DUE' | 'NEW',
+): Promise<ReviewQuestion[]> {
   if (isDemoMode()) return demoQuestions;
   if (!token) return [];
   const courses = await getMyCourses(token);
   const titles = new Map(courses.map((course) => [course.id, course.title]));
+  if (forceScope) {
+    return getQuestionQueue(token, forceScope, titles).catch(() => []);
+  }
   for (const scope of ['WRONG', 'DUE', 'NEW'] as const) {
     const questions = await getQuestionQueue(token, scope, titles);
     if (questions.length) return questions;
@@ -290,6 +337,7 @@ export async function getTeams(token?: string | null): Promise<Team[]> {
   if (isDemoMode()) return demoTeams;
   if (!token) return [];
   const payload = await backendFetch<{
+    isAdmin?: boolean;
     teams: Array<{
       id: string;
       name: string;
@@ -304,7 +352,9 @@ export async function getTeams(token?: string | null): Promise<Team[]> {
     name: team.name,
     description: team.description,
     memberCount: team._count.members,
-    role: team.members[0]?.role === 'OWNER' ? 'owner' : team.members[0]?.role === 'MANAGER' ? 'admin' : 'member',
+    role: team.members[0]?.role === 'OWNER'
+      ? 'owner'
+      : (team.members[0]?.role === 'MANAGER' || payload.isAdmin) ? 'admin' : 'member',
     courseCount: team._count.courses,
     accent: accentFor(team.id),
   }));
@@ -314,4 +364,51 @@ export async function getCourseOptions(token?: string | null): Promise<Course[]>
   if (isDemoMode()) return demoCourses.filter((course) => course.isEnrolled || course.canEdit);
   if (!token) return [];
   return getMyCourses(token);
+}
+
+export async function getLearnIdentity(token?: string | null): Promise<{ username: string; isAdmin: boolean } | null> {
+  if (!token) return null;
+  if (isDemoMode()) return { username: 'Demo', isAdmin: true };
+  const payload = await backendFetch<{ user: { username: string }; isAdmin: boolean }>(pathFor('/me'), {
+    token,
+    cache: 'no-store',
+  });
+  return { username: payload.user.username, isAdmin: payload.isAdmin };
+}
+
+export async function getLearnerSettings(token?: string | null): Promise<{
+  username: string;
+  profile: { dailyGoalMinutes: number; timezone: string; locale: Locale; theme: ThemeMode };
+} | null> {
+  if (!token) return null;
+  if (isDemoMode()) return { username: 'Demo', profile: { dailyGoalMinutes: 20, timezone: 'Europe/Rome', locale: 'de', theme: 'system' } };
+  const payload = await backendFetch<{
+    user: { username: string };
+    profile: { dailyGoalMinutes: number; timezone: string; locale?: Locale; theme?: ThemeMode };
+  }>(pathFor('/me'), { token, cache: 'no-store' });
+  return {
+    username: payload.user.username,
+    profile: {
+      dailyGoalMinutes: payload.profile.dailyGoalMinutes,
+      timezone: payload.profile.timezone,
+      locale: payload.profile.locale ?? 'de',
+      theme: payload.profile.theme ?? 'system',
+    },
+  };
+}
+
+export async function getLearnAdminOverview(token?: string | null): Promise<LearnAdminOverview | null> {
+  if (!token) return null;
+  if (isDemoMode()) {
+    return {
+      stats: { courseCount: 0, draftCount: 0, publishedCount: 0, enrollmentCount: 0, vocabularyCount: 0 },
+      runtime: {
+        webUntisOnly: true,
+        dictionary: { enabled: false, provider: 'not configured', allowedPairs: [] },
+        legalGate: { enabled: false, ready: false, privacyNoticeVersion: null },
+      },
+      courses: [],
+    };
+  }
+  return backendFetch<LearnAdminOverview>(pathFor('/admin/overview'), { token, cache: 'no-store' });
 }

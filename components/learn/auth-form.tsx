@@ -1,31 +1,66 @@
 'use client';
 
 import { ArrowRight, Eye, EyeOff, LockKeyhole, UserRound } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
-export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
+import { useLearnPreferences } from '@/components/providers/learn-preferences';
+
+export function AuthForm({ legalConfig }: { legalConfig: { privacyNoticeUrl: string; privacyNoticeVersion: string } }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLearnPreferences();
   const [visible, setVisible] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const isRegistration = mode === 'register';
+  const privacyConfigured = Boolean(legalConfig.privacyNoticeUrl && legalConfig.privacyNoticeVersion);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!privacyConfigured || !acknowledged) {
+      setError(privacyConfigured ? t('auth.privacyRequired') : t('auth.privacyUnavailable'));
+      return;
+    }
+
     setPending(true);
     setError('');
     const data = new FormData(event.currentTarget);
-    const response = await fetch(`/api/auth/${isRegistration ? 'register' : 'login'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: data.get('username'), password: data.get('password') }) });
-    const payload = await response.json().catch(() => null) as { error?: string } | null;
-    setPending(false);
-    if (!response.ok) { setError(payload?.error || 'Anmeldung nicht möglich.'); return; }
-    const returnTo = searchParams.get('returnTo');
-    router.push(returnTo && returnTo.startsWith('/') ? returnTo : '/dashboard');
-    router.refresh();
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: data.get('username'),
+          password: data.get('password'),
+          privacyNoticeVersion: legalConfig.privacyNoticeVersion,
+        }),
+      });
+      if (!response.ok) {
+        // The BFF deliberately returns generic failures for upstream/auth
+        // errors. Keep that boundary in the UI too: raw backend text may be
+        // untranslated or reveal implementation details.
+        setError(t('auth.unavailable'));
+        return;
+      }
+      const returnTo = searchParams.get('returnTo');
+      router.push(returnTo && returnTo.startsWith('/') ? returnTo : '/dashboard');
+      router.refresh();
+    } catch {
+      setError(t('auth.unavailable'));
+    } finally {
+      setPending(false);
+    }
   }
 
-  return <form className="auth-form" onSubmit={submit}><label>Benutzername<span className="input-icon"><UserRound size={17} /></span><input name="username" autoComplete="username" minLength={isRegistration ? 3 : 1} maxLength={30} required placeholder="dein-name" /></label><label>Passwort<span className="input-icon"><LockKeyhole size={17} /></span><input name="password" type={visible ? 'text' : 'password'} autoComplete={isRegistration ? 'new-password' : 'current-password'} minLength={isRegistration ? 8 : 1} required placeholder="••••••••" /><button className="password-toggle" type="button" onClick={() => setVisible((value) => !value)} aria-label={visible ? 'Passwort verbergen' : 'Passwort anzeigen'}>{visible ? <EyeOff size={17} /> : <Eye size={17} />}</button></label>{error && <p className="auth-error" role="alert">{error}</p>}<button className="button button--dark button--wide" disabled={pending} type="submit">{pending ? 'Einen Moment…' : isRegistration ? 'Konto erstellen' : 'Anmelden'} <ArrowRight size={16} /></button><p className="auth-switch">{isRegistration ? 'Schon registriert?' : 'Noch kein Konto?'} <Link href={isRegistration ? '/sign-in' : '/register'}>{isRegistration ? 'Anmelden' : 'Konto erstellen'}</Link></p></form>;
+  return (
+    <form className="auth-form" onSubmit={submit}>
+      <label>{t('auth.username')}<span className="input-icon"><UserRound size={17} /></span><input name="username" autoComplete="username" minLength={1} maxLength={100} required placeholder="dein-name" /></label>
+      <label>{t('auth.password')}<span className="input-icon"><LockKeyhole size={17} /></span><input name="password" type={visible ? 'text' : 'password'} autoComplete="current-password" minLength={1} maxLength={200} required placeholder="••••••••" /><button className="password-toggle" type="button" onClick={() => setVisible((value) => !value)} aria-label={visible ? t('auth.hidePassword') : t('auth.showPassword')}>{visible ? <EyeOff size={17} /> : <Eye size={17} />}</button></label>
+      {privacyConfigured ? <label className="auth-privacy"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /><span>{t('auth.privacyPrefix')} <a href={legalConfig.privacyNoticeUrl} target="_blank" rel="noreferrer">{t('auth.privacyLink')}</a>{' '}{t('auth.privacySuffix')}</span></label> : <p className="auth-privacy__missing">{t('auth.privacyUnavailable')}</p>}
+      {error && <p className="auth-error" role="alert">{error}</p>}
+      <button className="button button--dark button--wide" disabled={pending || !privacyConfigured} type="submit">{pending ? t('auth.checking') : t('auth.submit')} <ArrowRight size={16} /></button>
+      <p className="auth-switch">{t('auth.noAccount')}</p>
+    </form>
+  );
 }

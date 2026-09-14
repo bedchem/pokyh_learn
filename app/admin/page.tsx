@@ -1,14 +1,18 @@
-import { BadgeCheck, BookOpenCheck, Shield, SlidersHorizontal, UsersRound } from 'lucide-react';
+import { notFound, redirect } from 'next/navigation';
 
 import { AppShell } from '@/components/layout/app-shell';
+import { LearnAdminConsole } from '@/components/learn/learn-admin-console';
+import { getLearnAdminOverview, getLearnIdentity } from '@/lib/server/data';
+import { getAccessToken } from '@/lib/server/session';
 
-const areas = [
-  ['Kursfreigaben', 'Katalog-Inhalte prüfen, veröffentlichen oder zurückziehen.', BookOpenCheck],
-  ['Zugriffsrechte', 'Schreibrechte für Personen und Teams nachvollziehbar vergeben.', UsersRound],
-  ['Moderation', 'Öffentliche Inhalte und gemeldete Einträge prüfen.', BadgeCheck],
-  ['Plattformregeln', 'Grenzwerte, Provider-Policy und Lernkonfiguration verwalten.', SlidersHorizontal],
-];
+export const dynamic = 'force-dynamic';
 
-export default function AdminPage() {
-  return <AppShell><div className="page-wrap"><section className="page-heading"><div><p className="eyebrow">Plattformverwaltung</p><h1>Verantwortungsvoll verwalten.</h1><p className="page-lead">Dieser Bereich ist ausschließlich für serverseitig bestätigte Pokyh-Administratoren bestimmt.</p></div><span className="admin-shield"><Shield size={19} /> Admin</span></section><div className="admin-area-grid">{areas.map(([title, description, Icon]) => { const Component = Icon as typeof Shield; return <a href="#" className="panel admin-area" key={title as string}><span><Component size={22} /></span><h2>{title as string}</h2><p>{description as string}</p><i>Öffnen →</i></a>; })}</div></div></AppShell>;
+export default async function AdminPage() {
+  const token = await getAccessToken();
+  if (!token) redirect('/sign-in?returnTo=/admin');
+  const identity = await getLearnIdentity(token);
+  if (!identity?.isAdmin) notFound();
+  const overview = await getLearnAdminOverview(token);
+  if (!overview) notFound();
+  return <AppShell initialIdentity={identity}><div className="page-wrap"><LearnAdminConsole overview={overview} username={identity.username} /></div></AppShell>;
 }

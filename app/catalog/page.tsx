@@ -1,11 +1,29 @@
-import { AppShell } from '@/components/layout/app-shell';
+import { PublicCatalogFrame } from '@/components/layout/public-catalog-frame';
 import { CatalogExplorer } from '@/components/learn/catalog-explorer';
+import { Text } from '@/components/i18n/text';
 import { EmptyState } from '@/components/ui/empty-state';
-import { getCatalog } from '@/lib/server/data';
+import { getCatalog, getLearnIdentity } from '@/lib/server/data';
+import { getAccessToken } from '@/lib/server/session';
 
 export const dynamic = 'force-dynamic';
 
 export default async function CatalogPage() {
-  const courses = await getCatalog().catch(() => []);
-  return <AppShell><div className="page-wrap"><section className="page-heading"><div><p className="eyebrow">Kurskatalog</p><h1>Wähle, was du lernen möchtest.</h1><p className="page-lead">Entdecke frei lesbare Kurse und nimm genau die Inhalte in deinen Lernplan auf, die zu dir passen.</p></div></section>{courses.length ? <CatalogExplorer courses={courses} /> : <EmptyState title="Der Katalog ist gerade nicht erreichbar" body="Bitte prüfe die Backend-Verbindung oder versuche es später noch einmal." />}</div></AppShell>;
+  const token = await getAccessToken();
+  const [courses, identity] = await Promise.all([
+    getCatalog().catch(() => []),
+    token ? getLearnIdentity(token).catch(() => null) : null,
+  ]);
+
+  return (
+    <PublicCatalogFrame authenticated={Boolean(identity)}>
+      <div className="public-catalog__content">
+        <section className="public-catalog__heading">
+          <p className="eyebrow"><Text id="catalog.eyebrow" /></p>
+          <h1><Text id="catalog.title" /></h1>
+          <p className="page-lead"><Text id="catalog.body" /></p>
+        </section>
+        {courses.length ? <CatalogExplorer courses={courses} authenticated={Boolean(identity)} /> : <EmptyState title={<Text id="catalog.unavailable" />} body={<Text id="catalog.unavailableBody" />} />}
+      </div>
+    </PublicCatalogFrame>
+  );
 }

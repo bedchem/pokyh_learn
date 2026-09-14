@@ -1,0 +1,30 @@
+name: pokyh-learn
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      # Preserve literal secret characters in the operator-owned runtime file;
+      # Compose's interpolation belongs only to non-sensitive container wiring.
+      - path: ${LEARN_ENV_FILE:-.env}
+        required: true
+        format: raw
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3005}
+      HOSTNAME: 0.0.0.0
+    ports:
+      # Loopback by default: put a TLS reverse proxy in front of it for a
+      # public deployment. Set LEARN_BIND_ADDRESS deliberately if needed.
+      - ${LEARN_BIND_ADDRESS:-127.0.0.1}:${PORT:-3005}:${PORT:-3005}
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

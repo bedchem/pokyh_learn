@@ -90,23 +90,27 @@ visibility value.
 
 ## ADR-005 — Keep MySQL durable and Redis disposable
 
-**Status:** Accepted
+**Status:** Implemented narrowly for a private course-specific analytics cache;
+broader Redis roles remain planned.
 
 **Context:** The product needs fast catalogs, dashboard updates, rate limiting,
 and background verification, while a lost cache must never erase learning
 progress or distort a quiz.
 
 **Decision:** Use MySQL/Prisma transactions for all authoritative courses,
-permissions, enrollments, review state, quiz attempts, audit events, and import
-jobs. Use Redis only for namespaced cache entries, distributed rate limits,
-invalidation signals, and queue coordination. Durable job payload/status is
-also persisted in MySQL.
+permissions, enrollments, review state, quiz attempts, daily activity
+aggregates, audit events, and import jobs. The mounted Redis use is limited to a
+short-lived analytics response for an already-authorized course view. Its key
+uses an environment-controlled prefix and an opaque SHA-256 digest rather than
+the stable user ID. Rate limits, queues, distributed idempotency, and broader
+read caches are not Redis-backed Learn features at this point.
 
-**Consequences:** Redis restart means a bounded performance degradation and
-cache refill, not a logout or lost answer. No review queue or expected answer
-snapshot is shared in Redis. Production health checks distinguish durable
-database readiness from optional cache availability, while rate-limit policy
-defines whether temporary Redis loss should fail closed for sensitive routes.
+**Consequences:** Redis restart means a bounded performance degradation and a
+MySQL read, not a logout or lost answer. No review queue, expected answer
+snapshot, raw answer, permission, credential, or durable learning state is
+stored there. A course-specific cache read follows a fresh `VIEW` check; broad
+analytics are not served from Redis so a changed permission cannot be replayed
+from that cache.
 
 ## ADR-006 — Grade quizzes on a server-created snapshot
 
@@ -134,7 +138,10 @@ policy/configuration, not browser literals.
 
 ## ADR-007 — Model answer variants and verification separately from display text
 
-**Status:** Planned hardening; current implementation stores author text and an unverified/verified flag
+**Status:** Partially implemented; the current adapter stores an editorial text,
+normalizes it for server grading, and records `UNVERIFIED`, `VERIFIED` or
+`FLAGGED` against an explicit configured dictionary suggestion. Separate
+accepted-answer revision history remains planned hardening.
 
 **Context:** A vocabulary prompt can have valid articles, synonyms, punctuation
 variants, or several pedagogically accepted translations. A single string is
@@ -145,8 +152,8 @@ incomplete, ambiguous, or mismatched to the lesson's intended sense.
 `LearnVocabularyEntry`, accepted quiz variants in
 `LearnVocabularyAcceptedAnswer`, and verification facts in
 `LearnVocabularyValidation`. Normalize answers according to language policy on
-the server. Use a locally ingested Kaikki/Wiktionary-derived snapshot as the
-preferred suggestion source; retain manual editorial approval as the final
+the server. The current optional suggestion source is configured server-side
+and invoked only by an editor; retain manual editorial approval as the final
 authority.
 
 **Consequences:** Quiz grading remains consistent even when provider data is
@@ -156,42 +163,47 @@ licensing review are recorded before source-derived content is shown or reused.
 
 ## ADR-008 — Offer personal, versioned JSON portability rather than a raw database feature
 
-**Status:** Planned; no import/export route is mounted
+**Status:** Implemented for strict personal portability; platform migration and
+backup remain outside the Learn API
 
 **Context:** Users need to retain and move their own learning content. A raw
 database export or import would expose other people, grants, audit data,
 credentials, and internal identifiers.
 
-**Decision:** Provide asynchronous personal export/import jobs with a
-`pokyh-learn-export` versioned JSON envelope. A user exports only their allowed
-data. Import validates before writing, remaps identifiers, makes copied content
-private drafts, and strips owners, roles, grants, team membership, and secret
-data. Full database backup/restore remains an operator-only process outside the
-application API.
+**Decision:** Provide a synchronous, bounded personal export/import route with
+a `pokyh-learn-personal-export` versioned JSON envelope. A user exports only
+their own authored content and own learning state. Import validates before
+writing, remaps identifiers, makes copied content private drafts, and strips
+owners, roles, grants, team membership and secret data. Full database
+backup/restore remains an operator-only process outside the application API.
 
 **Consequences:** The feature supports portability without privilege escalation.
-Imports are bounded, idempotent, auditable, and can produce a detailed report.
-Incompatible review intervals are normalized to a safe due state instead of
-being accepted as proof of mastery.
+Imports are bounded and report created course/section/vocabulary counts. They
+never overwrite data or grant privilege. A future asynchronous platform import
+must add dry-run, durable audit and review-normalization policy before release.
 
 ## ADR-009 — Use teams for audience, not implicit authorship
 
-**Status:** Partially implemented; current route supports list/create and direct member upsert
+**Status:** Implemented with canonical-administrator group management
 
-**Context:** A learner should be able to create a team and share selected
-courses, but broad team roles can make it too easy to alter educational content
-or unintentionally expose it.
+**Context:** A team is a school/platform group boundary. Letting a learner-side
+`OWNER` or `MANAGER` label create groups or alter membership would make it too
+easy to change another person's learning access or unintentionally expose
+course content.
 
-**Decision:** Teams use `OWNER`, `MANAGER`, and `MEMBER` only for team
-membership and metadata. A `TEAM` course gives eligible members view/enrollment
-access; course writing requires direct `EDIT`/`MANAGE` or ownership. The current
-route performs a direct upsert for a known Pokyh user; invitation acceptance and
-ownership transfer remain future work.
+**Decision:** Teams use `OWNER`, `MANAGER`, and `MEMBER` as membership labels.
+A `TEAM` course gives eligible members view/enrollment access; course writing
+requires direct `EDIT`/`MANAGE` or ownership. Only a canonical Pokyh
+administrator, resolved server-side from the existing administrator sources,
+can create a group, manage membership, or attach a course to a group. Every
+member must be an existing verified WebUntis-backed Pokyh identity. There is no
+public invitation/acceptance flow.
 
-**Consequences:** A team manager can organize a group without changing every
-course linked to it. Removing a member invalidates team-derived read access
-immediately. Deleting a team turns linked courses private and preserves their
-content, preventing a cascading loss of learning materials.
+**Consequences:** A group label does not expand a learner's authority beyond
+the course access it receives. Removing a member invalidates team-derived read
+access immediately. Group deletion requires administrator confirmation and is
+blocked while linked team courses exist, preventing cascading loss or silent
+visibility changes.
 
 ## ADR-010 — Preserve Learn data across school-year maintenance
 
@@ -253,18 +265,71 @@ provider without code edits.
 
 ## ADR-013 — Build for low-latency reads without trusting device state
 
-**Status:** Planned hardening; current reads use bounded database queries and BFF cache policy
+**Status:** Implemented narrowly for private analytics; broader caching and
+offline behavior remain planned
 
 **Context:** Learning feels best when the dashboard, catalog, and next review
 appear immediately. A device may be offline or have stale content, however.
 
-**Decision:** Use bounded dashboard endpoints, keyset pagination, ETags,
-Redis-backed read caching, and a per-user device cache of safe read models and
-drafts. Use idempotent batch submit for quiz answers. The server still
-determines enrollment, progress, access, correctness, and due dates.
+**Decision:** The mounted `GET /analytics` route derives a bounded 7-, 28-, or
+90-day view from durable per-user/per-course/day aggregates. Course-specific
+analytics can use an optional Redis response cache only after a fresh access
+check; broad analytics and the dashboard read MySQL directly. Quiz submission
+is idempotent and invalidates the affected analytics cache after its durable
+transaction succeeds. Per-user device caches, ETags, and broader caching remain
+future work. The server still determines enrollment, progress, access,
+correctness, and due dates.
 
-**Consequences:** A cached dashboard can paint quickly and refresh in the
-background, while a lost device cache causes only a refetch. Offline drafts can
-be saved with a unique idempotency key; quiz completion is confirmed only after
-the server transaction succeeds. This avoids duplicate requests and preserves
-the authority of persistent state.
+**Consequences:** Analytics can be fast without making Redis a permission or
+learning authority. Cache loss causes a MySQL read, while repeated submissions
+return the original attempt rather than incrementing review or analytics state
+twice. Offline drafts are not yet a mounted claim; quiz completion is confirmed
+only after the server transaction succeeds.
+
+## ADR-015 — Keep adaptive review personal and analytics aggregate
+
+**Status:** Implemented
+
+**Context:** The platform needs helpful review timing and progress feedback
+without deriving a learner profile from raw answer content, sharing activity
+between users, or making a cache part of the learning record.
+
+**Decision:** Review timing is computed server-side from the learner's own
+durable review counters, prior interval, and ease factor. Protected Learn
+configuration bounds the initial/max interval, ease range, correct-answer
+increment, incorrect-answer penalty, and recovery delay. Each newly created
+idempotent quiz attempt transaction also upserts one `LearnActivityDaily` row
+for that learner, course, and local calendar day with counts only. Analytics
+read these aggregates plus the current review queue; they do not expose raw
+submitted answers or another learner's data.
+
+**Consequences:** A frequently missed word returns more cautiously while
+repeated success grows a bounded interval. Policy changes affect subsequent
+submissions without rewriting historical attempts. The daily aggregate supports
+private activity, accuracy, streak, queue, recommendation, and per-course
+summaries while keeping raw answer material out of the analytics store and
+cache.
+
+## ADR-014 — Fail closed until WebUntis integration readiness is configured
+
+**Status:** Implemented as a technical activation gate; legal approval remains
+an operator/controller responsibility.
+
+**Context:** A Learn login verifies WebUntis credentials. A consent checkbox
+alone does not establish authorisation from a school/controller, a GDPR lawful
+basis, processor terms, transparent information, or a safe operational setup.
+Accidentally deploying the route without those prerequisites would create a
+high-risk ambiguity.
+
+**Decision:** In production, the backend enables a fail-closed gate by default.
+`/auth/learn-login` is unavailable unless the operator configures a non-secret
+WebUntis approval reference, an HTTPS privacy-notice URL and a notice version.
+The frontend shows that notice, sends the version after the user acknowledges
+it, and the backend records the version/timestamp on the Learn profile. The
+administrator sees readiness and version only, never the approval reference.
+
+**Consequences:** The gate prevents accidental activation and makes a changed
+notice explicit at next sign-in. It does not claim legal compliance. Before
+production activation, the controller/school must complete the documented
+review in [legal readiness](./legal-readiness.md), including actual data flows,
+hosting/subprocessors, retention and rights handling.

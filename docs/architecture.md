@@ -4,8 +4,13 @@
 
 This document describes both the deployed core and its intended hardening path.
 The mounted endpoint and payload surface in [the API contract](./api-contract.md)
-is authoritative. References below to provider snapshots, Redis, audit models,
-import/export jobs, feature flags, or richer quiz sessions are target
+is authoritative. The deployed core includes WebUntis-only Learn admission,
+section completion-derived progress, course/section authoring, strict personal
+JSON portability, a separate Learn administration surface, an optional explicit
+dictionary-suggestion adapter, private daily learning analytics, and an optional
+Redis-backed course-specific analytics cache. References below to provider
+snapshots, audit models, platform backup jobs, feature flags, richer quiz
+sessions, or Redis uses beyond that narrow analytics cache are target
 architecture unless that contract explicitly marks them mounted.
 
 ## Purpose and non-negotiable rules
@@ -21,7 +26,8 @@ The following rules shape every implementation decision:
 1. `api.pokyh.com` is the only data authority. The Next.js application owns no
    database, never grades an answer, and never decides access.
 2. The existing Pokyh account is the only identity. Learn adds a profile on
-   first use; it does not add a second username, password, or token system.
+   first use after a confirmed WebUntis login; it does not add a second
+   username, password, or token system.
 3. A browser talks only to `learn.pokyh.com`. Server-side route handlers in the
    Next.js application act as a small backend-for-frontend (BFF) and call
    `api.pokyh.com` with server-only credentials. No API key, service key, or
@@ -46,14 +52,15 @@ learn.pokyh.com (Next.js)
     v
 api.pokyh.com (existing Express application)
     |                         |                         |
-    |                         |                         +-- planned dictionary snapshot/index
-    |                         +-- planned Redis cache / work queue
+    |                         |                         +-- optional explicit dictionary adapter
+    |                         +-- optional private analytics cache (Redis)
     +-- MySQL / Prisma (authoritative identity, content, access, progress)
 ```
 
-The BFF is deliberately thin: it validates the shape of browser input for good
-error messages, applies same-origin/session protections, forwards the request,
-and maps API errors to the user interface. Authorization, validation of the
+The BFF is deliberately thin: it bounds streamed JSON bodies with separate
+ordinary/import runtime limits, rejects traversal-like proxy segments, applies
+same-origin/session protections, forwards the request, and maps errors to safe
+user-facing output. Authorization, validation of the
 authoritative payload, quiz selection, answer matching, imports, and writes
 remain in the API. This makes mobile or future clients possible without
 duplicating rules.
@@ -82,9 +89,13 @@ and must not be described as a client requirement.
 
 ### Catalog and courses
 
-Published catalogue metadata may be read through the trusted BFF before a
-learner signs in; protected actions and private data always require a Pokyh
-account. The mounted route currently supports these visibility modes:
+Published catalogue metadata and topic titles may be read through the trusted
+BFF before a learner signs in. Authored lesson bodies, answer keys, vocabulary
+answers, review state, and quiz material are never part of that response. A
+learner signs in and adds an eligible public course before the authenticated
+course route returns its material; protected actions and private data always
+require a Pokyh account. The mounted route currently supports these visibility
+modes:
 
 | Visibility | Who can view and enroll | Who can change it |
 | --- | --- | --- |
@@ -97,7 +108,8 @@ than a fourth `PEOPLE` visibility enum. `DRAFT` courses are never
 catalog-visible to ordinary learners. `ARCHIVED` courses remain available to
 their owner and administrators for retention, but should not accept new
 enrollments. A creator can begin with a private course, grant a specific person
-access, attach it to a team, or publish it to the catalog according to policy.
+access, attach it to a team through a canonical Pokyh administrator, or publish
+it to the catalog according to policy.
 Publishing an individual course does not automatically publish every revision;
 a change can be drafted and then published intentionally.
 
@@ -118,24 +130,26 @@ unknown version safely rather than interpreting arbitrary content.
 
 ### Teams
 
-A team has an owner, managers, and members. The creator becomes the owner and
-is never silently removed. The mounted route lets an authorized owner or
-manager add an existing Pokyh user by stable UID or resolved username; there
-is not yet a public invitation/acceptance flow. Team roles control membership
-and team metadata, while course permissions control writing course content.
-This separation prevents a team manager from unexpectedly editing every linked
-course.
+A team has `OWNER`, `MANAGER`, and `MEMBER` membership labels. They identify
+membership context and can grant view/enrollment access to a linked `TEAM`
+course, but they do not confer group-administration authority. Only a canonical
+Pokyh administrator—resolved server-side from the existing `Admin` data or a
+configured canonical administrator username—can create a group, change its
+membership, or attach a course to it. Every assigned member must be an existing
+verified WebUntis-backed Pokyh user; there is no public invitation/acceptance
+flow.
 
-| Team role | Team capabilities | Course capability inherited from team membership |
+| Team role | Group-management authority | Course capability inherited from membership |
 | --- | --- | --- |
-| `OWNER` | Transfer ownership, delete team, manage managers and members | View team courses; explicit course permission still governs edits |
-| `MANAGER` | Invite/remove members and edit team metadata | View team courses; explicit course permission still governs edits |
-| `MEMBER` | View team membership and eligible team courses | View eligible team courses |
+| `OWNER` | None from the label alone; canonical administration remains required | View/enroll in eligible team courses; explicit course permission still governs edits |
+| `MANAGER` | None from the label alone; canonical administration remains required | View/enroll in eligible team courses; explicit course permission still governs edits |
+| `MEMBER` | None | View/enroll in eligible team courses |
 
-Deleting a team must not delete its courses. The API changes linked courses to
-`PRIVATE`, alerts the course owner, and records an audit event. Removing a
-member immediately revokes team-derived access without touching any direct
-course grant they may separately have.
+Deleting a group is an administrator action and must not cascade into course
+deletion. The mounted admin endpoint requires an exact name confirmation and
+refuses deletion while any team course remains linked. Removing a member
+immediately revokes team-derived access without touching a direct course grant
+they may separately have.
 
 ### Permission model
 
@@ -149,8 +163,8 @@ trusted client flags.
 | Explicit `EDIT` grantee | Eligible courses | Granted course only | No | No |
 | Course `MANAGE` grantee | Eligible courses | Granted course | Granted course | No |
 | Course owner | Eligible courses | Owned course | Owned course | No |
-| Team manager | Eligible team courses | Only with explicit course grant | Only with explicit course grant | No |
-| Pokyh administrator | All courses | All courses | All courses and policy-managed catalog actions | Yes |
+| Team member (any membership label) | Eligible team courses | Only with explicit course grant | No group-management authority | No |
+| Canonical Pokyh administrator | All courses | All courses | All courses, group membership, and policy-managed catalog actions | Yes |
 
 An administrator grants `VIEW`, `EDIT`, or `MANAGE` per course. A grant never
 turns a person into a global administrator. Direct grants take precedence over
@@ -163,7 +177,8 @@ The existing backend schema and mounted `/learn` router contain the core Learn
 models:
 `LearnProfile`, `LearnCourse`, `LearnCourseSection`, `LearnCourseAccess`,
 `LearnEnrollment`, `LearnVocabularyEntry`, `LearnVocabularyReview`,
-`LearnQuizAttempt`, `LearnTeam`, and `LearnTeamMember`. These are useful
+`LearnQuizAttempt`, `LearnActivityDaily`, `LearnTeam`, and `LearnTeamMember`.
+These are useful
 building blocks. The detailed as-built endpoint inventory is in
 [the API contract](./api-contract.md); do not infer an endpoint from a model
 name alone.
@@ -183,31 +198,34 @@ All new foreign keys use explicit indexes for their normal lookup path. User
 data always joins through `stableUid`, not username, because usernames are
 mutable presentation data.
 
-### Quiz and spaced review lifecycle
+`LearnActivityDaily` stores only a learner/course/local-calendar-day aggregate:
+attempt count, answer count, correct-answer count, and last activity time. It
+contains neither raw answer input nor answer keys. A new, idempotent quiz
+attempt updates its aggregate in the same MySQL transaction, so analytics do
+not depend on Redis availability.
 
-The server, not the browser, owns a complete quiz lifecycle:
+### Current quiz and spaced-review lifecycle
 
-1. The user requests a course quiz with a mode (`DUE`, `MISTAKES`, `NEW`, or
-   `MIXED`), direction, optional section filter, and requested count.
-2. The API checks enrollment/access, selects eligible entries from durable
-   review state, snapshots them into a short-lived quiz session, and returns
-   only the prompt, hint, allowed input type, and opaque question identifier.
-   Expected answers are never returned before submission.
-3. The browser can gather all answers locally, then makes one batched submit
-   request. It includes an idempotency key generated once for that submission.
-4. In one database transaction, the API locks the quiz session, verifies its
-   owner and expiry, normalizes each submitted answer language-sensitively,
-   grades it against the server snapshot, updates every review row, writes a
-   `LearnQuizAttempt`, marks the session submitted, and returns the result.
-5. Repeating the same idempotency key and identical payload returns the original
-   result. Reusing it with a different payload returns `409`.
+The mounted submission path is server-owned and idempotent:
 
-A wrong answer always increments `incorrectCount`, sets `lastWasCorrect` to
-false, and makes that entry eligible for the `MISTAKES` queue immediately or
-after the configured short recovery delay. Correct answers increase the
-versioned review interval. The interval algorithm is server-configured and
-stored with the attempt/session algorithm version so it can evolve without
-rewriting historical results. The client can show a suggested rating, but it
+1. The learner submits a bounded batch of answers with a one-time idempotency
+   key for an accessible, enrolled course.
+2. The API validates course access and enrollment, loads only the referenced
+   vocabulary entries, and grades against the server's saved editorial answer.
+3. In one MySQL transaction, it creates `LearnQuizAttempt`, updates each
+   `LearnVocabularyReview`, and updates the corresponding `LearnActivityDaily`
+   aggregate.
+4. Repeating the same idempotency key returns the original attempt instead of
+   adding another review update or analytics count.
+
+A wrong answer increments `incorrectCount`, sets `lastWasCorrect` to false, and
+makes that entry eligible for the `MISTAKES` queue immediately or after the
+configured recovery delay. Correct answers increase a bounded interval. The
+current adaptive policy uses only that learner's durable correct/incorrect
+counters, prior interval, and ease factor; it does not use raw answer text,
+another learner's activity, or a global model. Its initial/max interval, ease
+bounds, correct increment, incorrect penalty, and recovery delay are managed
+by a protected Learn configuration endpoint and apply prospectively. The client
 cannot set due dates, score, or correctness itself.
 
 Answer comparison is deliberate: normalize Unicode, whitespace, punctuation
@@ -254,32 +272,27 @@ unavailable.
 
 | Tier | Allowed data | Examples | Rule |
 | --- | --- | --- | --- |
-| MySQL | All durable state | Courses, grants, enrollments, review rows, attempts, audit events | Source of truth; every write is transactional. |
-| Redis | Reconstructable/short-lived state | Catalog pages, settings revision, rate-limit counters, distributed invalidation, work queue leases | An eviction may slow a request but must not lose a result. |
-| Device cache | Per-user read models and unsent drafts | Last dashboard revision, catalog shell, lesson text, in-progress answer draft | Keyed by signed-in user and schema revision; clear on logout or account change. |
+| MySQL | All durable state | Courses, grants, enrollments, review rows, attempts, `LearnActivityDaily` aggregates | Source of truth; the quiz/review/aggregate write is transactional. |
+| Redis (optional mounted use) | Reconstructable private analytics response only | A course-specific `GET /analytics` response after fresh course-access validation | A cache fault or eviction falls back to MySQL and cannot lose a result. |
+| Device cache (planned) | Per-user read models and unsent drafts | Future catalog shell, lesson text, in-progress answer draft | It is not evidence of completion/correctness and is not the current analytics authority. |
 
 Do not cache JWTs, refresh tokens, API/service credentials, server-only answer
 snapshots, or raw import files in browser storage. A device cache displays
 stale content while a background revalidation runs; it is never evidence that a
 lesson was completed or an answer was correct.
 
-Redis keys are versioned and namespaced, for example:
+The mounted Redis key uses an environment-controlled Learn prefix, the
+`analytics` namespace, and a SHA-256 digest of the caller's stable identity,
+range, and course identifier. It deliberately does not place the stable user ID
+in the Redis key. The cache holds no raw answer, answer key, permission, token,
+or mutable source-of-truth state.
 
-```text
-learn:v1:catalog:{filter-hash}:{cursor}
-learn:v1:course:{course-id}:{published-revision}
-learn:v1:dashboard:{stable-uid-hash}:{revision}
-learn:v1:ratelimit:{route}:{stable-uid-hash}
-learn:v1:dictionary:{provider}:{snapshot}:{language}:{term-hash}
-```
-
-Use short, environment-configured TTLs and publish an invalidation event after
-course, access, enrollment, or setting writes. A permissions change increments
-the affected access/dashboard revision so a stale cache cannot grant a view.
-Private review queues are read from MySQL; their results are not stored as
-shared Redis cache entries. Redis is required for production rate-limit and
-queue coordination, but cache reads must degrade to MySQL when it is briefly
-unavailable. Session and quiz durability do not depend on Redis.
+Only a course-specific analytics request is cacheable, and only after the API
+has performed a fresh `VIEW` permission check. Broad analytics are always read
+from MySQL to avoid a stale permission boundary. A successfully created quiz
+attempt invalidates the caller's affected analytics keys. The client response
+remains `Cache-Control: private, no-store`; Redis is internal acceleration only.
+Review queues, sessions, and quiz durability do not depend on Redis.
 
 ### Efficient API use
 
@@ -310,17 +323,38 @@ settings area, with values such as:
 API_BACKEND_URL=https://api.pokyh.com
 API_BACKEND_KEY=server-only-value
 LEARN_API_PREFIX=/learn
+LEARN_PRIVACY_NOTICE_URL=https://pokyh.com/legal?view=learn
+LEARN_PRIVACY_NOTICE_VERSION=2026-09-12
 # Backend deployment value; direct browser calls to /learn are restricted here.
 LEARN_ALLOWED_ORIGINS=https://learn.pokyh.com
 ```
 
 The frontend retains only server-side `API_BACKEND_KEY`; it has no
-`NEXT_PUBLIC_` secret. Redis, dictionary-provider, import, and additional
-service-credential variables are planned deployment concerns; do not add or
-claim them as active until their backend implementation is mounted and tested.
+`NEXT_PUBLIC_` secret. The backend's optional `LEARN_REDIS_URL` and
+`LEARN_REDIS_KEY_PREFIX` remain deployment-only values for the private
+analytics cache. Dictionary-provider, import, and additional service-credential
+variables must not be claimed as active until their backend implementation is
+mounted and tested.
 Administrator-editable policy may include defaults, feature enablement, and
 retention windows, but may never expose, replace, or return an environment
 secret.
+
+### WebUntis / privacy activation boundary
+
+Learn is an independent WebUntis-facing integration, not an implied extension
+of any existing Pokyh login. In production `LEARN_LEGAL_GATE_ENABLED` defaults
+to true. The backend refuses `/auth/learn-login` before any credential check
+unless it has a non-secret school/controller-approval reference, a versioned
+HTTPS Article-13 notice URL, and the matching notice version. The Next.js BFF
+shows that notice and forwards the acknowledged version; the backend persists
+only the accepted version/timestamp on the Learn profile.
+
+This is a technical fail-closed guard, not a legal basis. The controller must
+complete the approval, controller/processor role assessment, retention,
+recipient/transfer, cookie and real-deployment review listed in
+[legal readiness](./legal-readiness.md) before enabling production access.
+The admin overview may expose only gate readiness and notice version; it must
+never display approval references, secrets or legal documents.
 
 ### Required controls
 
@@ -349,6 +383,9 @@ secret.
 - Do not put bearer tokens or API keys in URLs. SSE, if later used, needs a
   short-lived signed connection ticket rather than a long-lived token query
   parameter.
+- Before production WebUntis sign-in, record controller/school approval and
+  complete the [legal readiness](./legal-readiness.md) review. A configured
+  notice checkbox is transparency evidence only, never the legal basis.
 
 ## Existing-backend migration and rollout
 
@@ -362,8 +399,10 @@ work is:
    accepted-answer, validation, import, audit, and policy models/indexes. Run
    it in staging first and use a controlled production migration; do not rely on
    a destructive schema reconciliation.
-3. Add Redis connectivity, health checks, namespaced keys, and a graceful cache
-   fallback. Do not route durable writes through Redis.
+3. Keep the mounted optional Redis analytics cache private and failure-tolerant:
+   validate its deployment, namespacing, TTL, and fallback without routing
+   durable writes through Redis. Redis-backed queues, rate limits, or shared
+   idempotency remain separate future work.
 4. Ship read-only catalog and course access first; then authoring, vocabulary
    verification, teams, imports, and quizzes behind environment-controlled
    feature flags.

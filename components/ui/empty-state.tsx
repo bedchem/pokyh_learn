@@ -9,10 +9,10 @@ export function EmptyState({
   action,
   icon,
 }: {
-  title: string;
-  body: string;
+  title: ReactNode;
+  body: ReactNode;
   href?: string;
-  action?: string;
+  action?: ReactNode;
   icon?: ReactNode;
 }) {
   return (

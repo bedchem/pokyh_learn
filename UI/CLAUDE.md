@@ -7,6 +7,22 @@ for a first-time learner, focused enough for daily practice, and robust enough
 for course authors and teams. The interface turns a large learning catalogue
 into a small, helpful next action.
 
+## Delivery coordination
+
+- Before a material design edit, inspect `git status` and relevant open pull
+  requests, including their merge/conflict state. Preserve other contributors'
+  work; never delete, reset, clean, rename, or overwrite it to resolve a
+  conflict without the human owner's explicit direction.
+- Record each material design, accessibility, documentation, verification, PR,
+  commit, or push step as a factual, non-sensitive entry in `docs/worklog/`.
+  Capture the intent, outcome, affected area, verification, remaining risk, and
+  release state—not private reasoning or credentials.
+- Only after a coherent visual checkpoint has passed its required checks may an
+  assistant ask once for the exact `Name <email>` and commit/push scope. Do not
+  commit before the relevant tests and visual checks pass, or add any
+  AI/assistant co-author, trailer, signature, or branding unless the owner
+  explicitly requests it.
+
 The visual reference is a mood and interaction direction only: soft spacious
 surfaces, modular dashboard cards, restrained pastel learning states, strong
 dark active controls, clear data hierarchy, and a welcoming human pace. Do not
@@ -26,6 +42,12 @@ copy a screen, logo, asset, wording, layout, or proprietary visual identity.
 Use named, token-based design values. Do not scatter raw colour, shadow,
 spacing, radius, or animation choices across features. The global stylesheet
 owns the baseline tokens; reusable primitives consume them.
+
+The visual language is deliberately flat: do not use CSS gradients, glossy
+glass effects, decorative AI-style blobs, or generated stock-like imagery.
+Use clear solid surfaces, borders, typography and restrained semantic colour to
+create hierarchy. Support the paired light (`#f1f0f8` canvas) and dark
+(`#09090c` canvas) token themes; neither theme is an afterthought.
 
 ### Colour roles
 
@@ -57,6 +79,10 @@ backend, not a hard-coded identity rule.
   as the sole accessible label.
 - Foreign-language example text must retain correct characters and language
   metadata where semantic markup permits it.
+- Product-owned controls and status copy must use the locale system for
+  German, English and Italian. Course/lesson text is authored content and must
+  retain the language selected by its author instead of being silently
+  machine-translated.
 
 ### Shape, spacing, and elevation
 
@@ -72,6 +98,9 @@ backend, not a hard-coded identity rule.
 - Motion confirms a meaningful state change, such as a quiz result, saving,
   navigation, or opening a sheet.
 - Keep motion short, subtle, and interruptible.
+- GSAP is permitted only for a bounded, one-time transition that improves
+  hierarchy; clean up its context on unmount and never animate state that is
+  meaningful for progress, correctness or permission.
 - Respect `prefers-reduced-motion`; no progress or feedback depends on an
   animation to be understandable.
 - Do not add autoplay, parallax, bouncing mascots, or distracting page-wide
@@ -212,7 +241,8 @@ placeholder as the only label.
 Import/export has a cautious visual language:
 
 - state what is included and excluded;
-- show schema/version checking and preview before mutation;
+- show that schema/version checking happens server-side before mutation; use a
+  preview only when that backend capability is actually available;
 - distinguish a local file selection from a completed server import;
 - explain failures without exposing internal implementation details;
 - warn specifically that role, credential, and membership changes cannot be

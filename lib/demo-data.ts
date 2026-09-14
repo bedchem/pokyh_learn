@@ -86,21 +86,25 @@ export const demoCourses: Course[] = [
 
 export const demoDashboard: DashboardData = {
   displayName: 'Felix',
-  streakDays: 7,
-  weeklyGoal: 5,
-  weeklyGoalProgress: 3,
-  dueReviews: 14,
-  mistakesToReview: 6,
-  minutesThisWeek: 86,
-  progressSeries: [
-    { label: 'Mo', value: 32 },
-    { label: 'Di', value: 48 },
-    { label: 'Mi', value: 41 },
-    { label: 'Do', value: 69 },
-    { label: 'Fr', value: 58 },
-    { label: 'Sa', value: 79 },
-    { label: 'So', value: 67 },
-  ],
+  dailyGoalMinutes: 20,
+  analytics: {
+    range: '7d',
+    timezone: 'Europe/Rome',
+    dataAvailableSince: '2026-09-01',
+    totals: { attempts: 28, answers: 86, correctAnswers: 72, accuracyPercent: 83.7, activeDays: 7, streakDays: 7 },
+    days: [
+      { dayKey: '2026-09-06', attempts: 3, answers: 12, correctAnswers: 10 },
+      { dayKey: '2026-09-07', attempts: 4, answers: 14, correctAnswers: 12 },
+      { dayKey: '2026-09-08', attempts: 4, answers: 10, correctAnswers: 8 },
+      { dayKey: '2026-09-09', attempts: 5, answers: 17, correctAnswers: 14 },
+      { dayKey: '2026-09-10', attempts: 4, answers: 11, correctAnswers: 9 },
+      { dayKey: '2026-09-11', attempts: 4, answers: 13, correctAnswers: 11 },
+      { dayKey: '2026-09-12', attempts: 4, answers: 9, correctAnswers: 8 },
+    ],
+    queues: { due: 14, wrong: 6, fresh: 8, nextDueAt: '2026-09-13T08:00:00.000Z' },
+    recommendation: { kind: 'due', count: 14, href: '/practice?queue=due' },
+    courses: [],
+  },
   activeCourses: demoCourses.filter((course) => course.isEnrolled),
   reviewCards: [
     {

@@ -81,7 +81,6 @@ Supported visibility states are:
 | Visibility | Who can read | Who can change |
 | --- | --- | --- |
 | `private` | owner and explicitly granted people | owner and editors |
-| `people` | explicitly granted people | owner and editors |
 | `team` | current members of the selected team | owner, editors, and allowed team roles |
 | `public` | catalogue visitors after publication | owner/editors; publication policy controls visibility |
 
@@ -123,10 +122,13 @@ answer in a live quiz.
 ### Personal courses and teams
 
 Any authenticated learner may create private content within configured limits.
-They may share it with explicitly selected people or a team if the backend
-confirms the right to do so. A team has an owner, members, role assignments,
-invitations, and scoped course access. Membership changes must immediately
-invalidate access and affected caches.
+They may share it with explicitly selected people when the backend confirms the
+right to do so. A team has an owner, members, role assignments, and scoped
+course access, but group creation, membership changes, and linking a course to
+a team are canonical Pokyh administrator actions. A normal learner may use a
+team course assigned to them; a UI role label is never authority to administer
+that group. Membership changes must immediately invalidate access and affected
+caches.
 
 The platform administrator can grant authoring capabilities, edit access,
 catalogue publication rights, moderation capability, and feature access. Do
@@ -146,8 +148,7 @@ the API, but it must treat them as hints rather than enforcement.
 | Learner | Enroll in accessible courses; own progress; private content within policy |
 | Course owner | Create, edit, share, archive, and export their own course |
 | Course editor | Edit only the granted course/content scope |
-| Team member | Read team-scoped content allowed to their membership |
-| Team administrator | Manage permitted team content and membership, never platform policy |
+| Team member | Read team-scoped content allowed to their membership; no group-administration authority from the membership label alone |
 | Platform administrator | Moderate, grant access, configure policy, review audit data |
 
 Authorization requirements:
@@ -160,13 +161,16 @@ Authorization requirements:
 - Do not accept `ownerId`, `stableUid`, `isAdmin`, `teamRole`, `visibility`,
   or `canEdit` from a client as authority.
 - Treat role and membership changes as security events and write audit records.
-- Use a server-side Pokyh `Admin` lookup for platform administration; the
-  normal user JWT deliberately does not carry a mutable admin flag.
+- Resolve platform administration server-side from the canonical Pokyh
+  administrator sources (the durable `Admin` record or an
+  `ADMIN_USERNAMES` match on the canonical user); the normal user JWT
+  deliberately does not carry a mutable admin flag.
 
 ## Identity and Session Design
 
-Pokyh accounts are the only identity system. A person needs an existing,
-registered Pokyh account to access protected Learn functions.
+Pokyh accounts are the only identity system. Learn admits only a canonical
+Pokyh account whose login was confirmed against WebUntis; a local fallback
+Pokyh account cannot create, read, receive a grant for, or manage Learn data.
 
 ```text
 Browser
@@ -214,14 +218,24 @@ GET   /learn/me
 GET   /learn/dashboard
 GET   /learn/courses
 POST  /learn/courses
+PATCH /learn/courses/:id
 GET   /learn/courses/:id
 POST  /learn/courses/:id/enroll
+POST  /learn/courses/:id/sections/:sectionId/complete
+POST  /learn/courses/:id/sections
+PATCH /learn/courses/:id/sections/:sectionId
+POST  /learn/courses/:id/sections/reorder
 GET   /learn/vocabulary
 POST  /learn/vocabulary
+POST  /learn/vocabulary/lookup
+POST  /learn/vocabulary/:entryId/verify
 GET   /learn/reviews
 POST  /learn/quiz-attempts
+GET   /learn/library/export
+POST  /learn/library/import
 GET   /learn/teams
 POST  /learn/teams
+GET   /learn/admin/overview
 POST  /learn/admin/course-access
 ```
 
@@ -310,24 +324,26 @@ An external service can help discover spelling, form, example, or translation
 suggestions. It is advisory only. The app's curated content is the authority
 for a quiz.
 
-### Default provider strategy
+### Current provider strategy
 
-The baseline open-data approach is a versioned, server-side import from
-Kaikki/Wiktionary data with license and provenance preserved, followed by human
-review. This avoids a fragile live dependency for every word and works well for
-German, English, and Italian lexical data.
+The mounted adapter is disabled by default and configured entirely through
+`LEARN_DICTIONARY_*`. When enabled, an authorized editor can explicitly ask the
+server for a MyMemory suggestion for an allowed language pair. The response is
+shown as a suggestion, then a human saves the editorial answer; it is never a
+live quiz judge. Provider calls are server-side, bounded by timeout/cache
+policy and never initiated by a learner's list view.
 
-Wiktionary's live Action API can be used only for rate-limited, server-side
-editor lookup with an identifiable user agent, backoff, attribution, source
-revision, and license handling. It must not be called from browsers or used as
-a real-time quiz judge.
+A reviewed Kaikki/Wiktionary snapshot can be added later as a local lexical
+source only after its license, provenance, update process and storage policy
+are documented. Do not silently replace the mounted adapter or imply that a
+future source has been deployed.
 
 Optional provider choices are server configuration:
 
 | Need | Safe default |
 | --- | --- |
-| Lexical lookup/import | Kaikki/Wiktionary snapshot plus editorial review |
-| Translation proposal | Configured server-side provider, labeled as a suggestion |
+| Lexical lookup/import | Explicit server-side, configured suggestion plus editorial review |
+| Translation proposal | Configured server-side provider, labelled as a suggestion |
 | Writing feedback | Self-hosted LanguageTool or similarly reviewed service |
 | Quiz correctness | Own curated accepted answers only |
 
@@ -343,23 +359,24 @@ grading functional.
 
 ## JSON Import and Export
 
-Do not expose raw database dumps. Import and export use a versioned, documented
-JSON manifest, with a top-level shape similar to:
+Do not expose raw database dumps. The mounted personal import/export uses a
+versioned, documented JSON manifest:
 
 ```json
 {
-  "format": "pokyh-learn",
+  "kind": "pokyh-learn-personal-export",
   "version": 1,
-  "kind": "course | vocabulary | personal-progress",
-  "createdAt": "ISO-8601 timestamp",
-  "payload": {}
+  "exportedAt": "ISO-8601 timestamp",
+  "profile": {},
+  "courses": []
 }
 ```
 
-The schema is validated server-side before any write. Imports must enforce
-maximum bytes, nested item limits, schema version, string lengths, supported
-language tags, duplicate rules, references, ownership, and allowed
-visibility. Use a dry-run/preflight response before applying material imports.
+The schema is validated server-side before any write. The current personal
+import enforces configured nested limits, version, string lengths, duplicates
+and internal references, remaps every ID, and creates only private drafts. A
+future administrative or material import must add an explicit dry-run/preflight
+and durable audit record before it can be exposed.
 
 Rules:
 
@@ -371,8 +388,8 @@ Rules:
   overwrite another owner's resource, or bypass moderation.
 - Export excludes passwords, access tokens, refresh tokens, API keys, audit
   secrets, and unrelated users' progress.
-- Every completed import/export is audited with actor, scope, version, and
-  outcome; payload contents are not copied into ordinary logs.
+- Payload contents must never be copied into ordinary logs. A future
+  platform-wide import/export requires a dedicated audit trail before release.
 
 ## Cache, Offline, and Performance
 
@@ -429,7 +446,8 @@ components/ui/          low-level visual primitives
 lib/client/             browser-safe BFF client only
 lib/server/             server-only configuration, data, session, backend client
 UI/                     visual system context and design rules
-docs/                   architecture, API contract, decisions
+docs/                   architecture, API contract, decisions, delivery evidence
+docs/worklog/           chronological, non-sensitive implementation protocol
 .github/workflows/      deterministic CI
 ```
 
@@ -474,6 +492,8 @@ or production cookie.
 | Variable | Scope | Purpose |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | public metadata | canonical Learn origin |
+| `PORT` | runtime | frontend listener port; production compose default is `3005` |
+| `LEARN_BIND_ADDRESS` | deployment | host address Compose binds; default is loopback only |
 | `API_BACKEND_URL` | server only | `api.pokyh.com` base URL |
 | `API_BACKEND_KEY` | server only | backend API-key gate |
 | `LEARN_SESSION_COOKIE_NAME` | server only | HttpOnly access cookie name |
@@ -483,17 +503,21 @@ or production cookie.
 | `LEARN_COOKIE_DOMAIN` | server only | optional cookie scope |
 | `LEARN_API_PREFIX` | server only | backend Learn route prefix |
 | `LEARN_API_TIMEOUT_MS` | server only | BFF backend deadline |
+| `LEARN_BFF_BODY_LIMIT_BYTES` | server only | bounded ordinary JSON body size accepted by the BFF |
+| `LEARN_BFF_IMPORT_BODY_LIMIT_BYTES` | server only | separately bounded library-import JSON body size accepted by the BFF |
+| `LEARN_PRIVACY_NOTICE_URL` | server runtime / safe public output | HTTPS legal notice URL passed to the sign-in form at request time |
+| `LEARN_PRIVACY_NOTICE_VERSION` | server runtime / safe public output | notice version matched by the backend before WebUntis verification |
 | `NEXT_PUBLIC_LEARN_DEMO_MODE` | local development only | enables static visual demo data |
 
 The production backend additionally configures at least:
 
 - `CORS_ORIGIN` including exactly `https://learn.pokyh.com` and approved local
   development origins;
-- `LEARN_ENABLED`, import size limits, request limits, session/quiz TTLs, and
-  cache TTLs;
-- `REDIS_URL` once Redis is deployed;
-- dictionary/translation/writing provider policy, URL, timeout, credentials,
-  language pairs, and attribution;
+- `LEARN_ALLOWED_ORIGINS`, `BODY_LIMIT_IMPORT`, request limits and cache TTLs;
+- `LEARN_DICTIONARY_ENABLED`, provider URL/contact, allowed language pairs,
+  timeout and bounded cache policy;
+- `LEARN_IMPORT_MAX_*` item limits;
+- Redis only after a dedicated deployment review;
 - admin-configured catalogue policy, public publishing policy, authoring
   limits, moderation rules, and retention policy.
 
@@ -513,8 +537,9 @@ Before any release, check all of the following:
 4. Public catalogue routes cannot disclose drafts, private course metadata,
    team membership, author-only notes, or personal progress.
 5. Course, team, and grant lookups are scoped before data is fetched.
-6. Imports are schema-validated, size-limited, permission-checked, dry-run
-   capable, auditable, and unable to grant privilege.
+6. The mounted personal import is schema-validated, size-limited,
+   permission-checked, remapped into private drafts, and unable to grant
+   privilege. Broader imports require dry-run and audit work before exposure.
 7. Quiz submissions are idempotent and server-graded.
 8. Cache keys/responses cannot cross user/team/visibility boundaries.
 9. Logs and error responses contain no credentials, raw secrets, sensitive
@@ -534,6 +559,18 @@ Before any release, check all of the following:
 - Keep `README.md`, `.env.example`, `docs/architecture.md`,
   `docs/api-contract.md`, and `docs/decisions.md` current whenever the contract
   changes.
+- Maintain `docs/worklog/` for every implementation run. Before an agent makes
+  a material product, security, deployment, design, or documentation change,
+  it records the intent; after the change it records the outcome, affected
+  files/services, verification, remaining risk, and release state. Add a
+  concise timestamped entry for each meaningful decision, edit batch, test,
+  visual check, dependency change, PR check, commit, and push. A worklog is a
+  durable summary—not a transcript of private reasoning—and must never contain
+  credentials, tokens, passwords, raw personal data, production URLs with
+  embedded secrets, or copied third-party private content.
+- Start each delivery with a dedicated dated worklog file from
+  `docs/worklog/README.md`; update it as work proceeds so another maintainer
+  can recover the exact technical context without relying on chat history.
 - Do not add a dependency without a concrete need, bundle-size review, and
   security review.
 - Do not use destructive database commands, drop tables, overwrite unrelated
@@ -542,15 +579,47 @@ Before any release, check all of the following:
   extension and test both paths.
 - Test visible states, keyboard navigation, focus movement, error states,
   loading states, empty states, mobile layout, and unauthorized access paths.
-- Use the configured Git identity. Do not change identity, force-push, or
-  rewrite shared history without a specific request.
+- Before starting work, inspect open pull requests for both repositories. If a
+  relevant PR exists, inspect its merge state and resolve only actual merge
+  conflicts before continuing; do not overwrite a contributor's work. Repeat
+  this check for every affected repository, including the shared Pokyh frontend.
+- Before each material edit batch, inspect `git status` and preserve every
+  unfamiliar modified or untracked file. Never delete, reset, clean, rename, or
+  overwrite another contributor's work to simplify a conflict; document the
+  hand-off or ask the human owner when the scope is unclear.
+- After a coherent checkpoint has passed its relevant tests, ask the user once
+  for that checkpoint's exact commit/push scope and Git identity in the exact
+  form `Name <email>`. Do not create even a checkpoint commit before those tests
+  pass or before that explicit answer is received. Use only the confirmed
+  identity in local repository configuration; never change global identity,
+  write it into project files, or store it outside `.git/config`.
+- Never add an AI/assistant `Co-authored-by` trailer, signature, branding or
+  attribution to commits, source files, documentation, PR text or release
+  notes unless the user explicitly asks for it. Do not force-push or rewrite
+  shared history without a specific request.
 - Before delivery, run the relevant type check, lint, production build, API
   tests/contract checks, and browser smoke tests. Inspect the diff for secrets,
   unrelated files, accidental generated output, configuration leakage, and
   placeholder content enabled in production.
-- When the user instructs a release, commit only after all checks pass, use a
-  clear message, push the current branch, and report the verified revision and
-  remote result.
+- After the user confirms the release scope and identity, commit only after all
+  checks pass, use a clear message, push the current branch, and report the
+  verified revision and remote result.
+
+### Smooth scrolling (Lenis)
+
+- Lenis is a Learn-frontend-only enhancement. Import it only from the locally
+  installed package and lockfile; do not load it from a CDN or use it in the
+  API, authentication, grading, or administration service.
+- Native browser scrolling remains the semantic baseline. Respect
+  `prefers-reduced-motion`, keep keyboard/focus/anchor behavior intact, and
+  make every route completely usable when Lenis is disabled or unavailable.
+- Mark modals, forms, popovers, and every nested interactive scroll region with
+  `data-lenis-prevent`. Do not scroll-jack touch input, trap keyboard scrolling,
+  or make learning progress, correctness, saving, or navigation depend on a
+  scroll animation.
+- When Lenis changes, test reduced motion, keyboard navigation, focus movement,
+  touch scrolling, anchor links, and nested scrolling at mobile and desktop
+  widths before the checkpoint can be committed.
 
 ## CI
 
@@ -590,13 +659,24 @@ Do not ship if any item is incomplete:
 
 ## Known Follow-ups
 
-The delivered Learn core persists all learning data in MySQL. Redis is not yet
-present in the existing Pokyh deployment, so introduce it through a dedicated,
-reviewed deployment change before enabling multi-instance cache/idempotency or
-distributed review scheduling. The app must keep working correctly when that
-cache is unavailable.
+The delivered Learn core persists all learning data in MySQL. The source and
+Compose configuration can optionally run Redis for a private course-specific
+analytics response cache; it must fall back to MySQL and is not evidence that a
+remote production Redis service is deployed. Verify the deployed topology
+separately before enabling any use beyond that narrow cache.
 
-Before enabling an external dictionary/translation provider in production,
-review its license, privacy impact, rate limits, required attribution, cache
-rights, language support, and outage behaviour. Keep curated answer variants
-as the quiz authority regardless of the provider.
+Before enabling the optional MyMemory dictionary adapter in production, review
+its terms, privacy impact, rate limits, required attribution, cache rights,
+language-pair support and outage behaviour. Keep curated answer variants as the
+quiz authority regardless of the provider; manual authoring must work if the
+provider is unavailable.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -1,16 +1,17 @@
 import { AppShell } from '@/components/layout/app-shell';
+import { Text } from '@/components/i18n/text';
 import { VocabularyWorkspace } from '@/components/learn/vocabulary-workspace';
 import { EmptyState } from '@/components/ui/empty-state';
 import { getCourseOptions, getVocabulary } from '@/lib/server/data';
-import { getAccessToken } from '@/lib/server/session';
+import { requireLearnUser } from '@/lib/server/learn-admin';
 
 export const dynamic = 'force-dynamic';
 
 export default async function VocabularyPage() {
-  const token = await getAccessToken();
+  const { token, identity } = await requireLearnUser('/vocabulary');
   const [courses, items] = await Promise.all([
     getCourseOptions(token).catch(() => []),
     getVocabulary(token).catch(() => []),
   ]);
-  return <AppShell><div className="page-wrap"><section className="page-heading page-heading--inline"><div><p className="eyebrow">Deine Wortlisten</p><h1>Vokabeln, die du wirklich brauchst.</h1><p className="page-lead">Ein Wort genügt: Der Server ergänzt einen Kontextsatz in der Kurssprache und hält Antworten für das Quiz geschützt.</p></div></section>{courses.length ? <VocabularyWorkspace initialItems={items} courses={courses} /> : <EmptyState title="Wähle zuerst einen Kurs" body="Füge einen Kurs aus dem Katalog hinzu, bevor du eigene Vokabeln verwaltest." href="/catalog" action="Katalog öffnen" />}</div></AppShell>;
+  return <AppShell initialIdentity={identity}><div className="page-wrap"><section className="page-heading page-heading--inline"><div><p className="eyebrow"><Text id="vocabulary.eyebrow" /></p><h1><Text id="vocabulary.title" /></h1><p className="page-lead"><Text id="vocabulary.body" /></p></div></section>{courses.length ? <VocabularyWorkspace initialItems={items} courses={courses} /> : <EmptyState title={<Text id="vocabulary.emptyTitle" />} body={<Text id="vocabulary.emptyBody" />} href="/catalog" action={<Text id="courses.openCatalog" />} />}</div></AppShell>;
 }

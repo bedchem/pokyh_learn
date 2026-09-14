@@ -37,6 +37,38 @@
   release scope before a commit or push.
 - Release state: uncommitted
 
+## 2026-09-14 09:24 CEST — public API 502 and CORS follow-up
+
+- Intent: Diagnose the browser-reported cross-origin failures and repeated
+  same-origin Mensa proxy failures without changing operator-owned production
+  configuration.
+- Outcome: The public API returned `502 Bad Gateway` for its readiness route
+  and for each tested browser preflight target. This response is generated
+  before the Express application runs, so it cannot contain the application's
+  CORS headers. The local Compose stack running the reviewed startup fix was
+  healthy; its equivalent `OPTIONS` request returned `204` with the configured
+  frontend origin, credential support, methods, and required request headers.
+  The frontend Mensa route is a small server-side proxy to the API's dishes
+  route, so its `502` is a downstream consequence of the same unavailable API,
+  not an independent Mensa failure.
+- Affected areas: Production verification only. No application route or
+  operator environment file was changed in this follow-up.
+- Verification:
+  - Public readiness and API preflight probes returned `502`.
+  - The local backend stack reported healthy and returned `200` from readiness.
+  - The local preflight from the Pokyh frontend origin returned the expected
+    CORS response headers.
+  - The previously reviewed Redis-startup fix is available on the backend
+    deployment branch as `fd6e013`.
+- Risk / next step: The hosting platform must redeploy the current deployment
+  branch and show a healthy application container before a public CORS retest
+  is meaningful. After it is healthy, keep the configured frontend origins as
+  literal comma-separated HTTPS origins (not Markdown links) and recheck the
+  browser preflight. This worklog contains no environment values, credentials,
+  request bodies, account data, or copied production logs.
+- Release state: backend fix pushed `origin/main` at `fd6e013`; this follow-up
+  worklog update is uncommitted.
+
 ## 2026-09-14 07:57 CEST — hotfix verification follow-up
 
 - Intent: Re-run the release checks after documenting the production startup

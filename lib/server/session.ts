@@ -1,10 +1,11 @@
 import 'server-only';
 
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getServerConfig } from '@/lib/server/config';
+import { ClientRequestProblem } from '@/lib/server/request-body';
 
 const cookieBase = () => {
   const config = getServerConfig();
@@ -55,6 +56,33 @@ export function writeSession(
   });
 }
 
+export function writeRefreshedAccessToken(response: NextResponse, accessToken: string) {
+  const config = getServerConfig();
+  response.cookies.set(config.sessionCookieName, accessToken, {
+    ...cookieBase(),
+    httpOnly: true,
+    maxAge: 60 * 60,
+  });
+}
+
+// The backend rotates the refresh token on every /auth/refresh call (the old
+// one is deleted server-side) — the new one must be stored here or the next
+// refresh attempt has nothing valid left to present.
+export function writeRefreshedTokens(response: NextResponse, value: { accessToken: string; refreshToken: string }) {
+  const config = getServerConfig();
+  const base = cookieBase();
+  response.cookies.set(config.sessionCookieName, value.accessToken, {
+    ...base,
+    httpOnly: true,
+    maxAge: 60 * 60,
+  });
+  response.cookies.set(config.refreshCookieName, value.refreshToken, {
+    ...base,
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 30,
+  });
+}
+
 export function clearSession(response: NextResponse) {
   const config = getServerConfig();
   const base = cookieBase();
@@ -67,19 +95,30 @@ export function assertSameOrigin(request: NextRequest) {
   const origin = request.headers.get('origin');
   const host = request.headers.get('host');
   if (!origin || !host) {
-    throw new Error('Missing request origin');
+    throw new ClientRequestProblem('Diese Anfrage wurde abgelehnt.', 403);
   }
 
-  const url = new URL(origin);
-  if (url.host !== host) {
-    throw new Error('Cross-origin request blocked');
+  try {
+    const url = new URL(origin);
+    if (url.host !== host) {
+      throw new ClientRequestProblem('Diese Anfrage wurde abgelehnt.', 403);
+    }
+  } catch (error) {
+    if (error instanceof ClientRequestProblem) throw error;
+    throw new ClientRequestProblem('Diese Anfrage wurde abgelehnt.', 403);
   }
 }
 
 export function assertCsrf(request: NextRequest) {
   const expected = request.cookies.get(cookieNames().csrf)?.value;
   const supplied = request.headers.get('x-csrf-token');
-  if (!expected || !supplied || expected !== supplied) {
-    throw new Error('Invalid CSRF token');
+  if (!expected || !supplied) {
+    throw new ClientRequestProblem('Diese Anfrage wurde abgelehnt.', 403);
+  }
+
+  const expectedBytes = Buffer.from(expected);
+  const suppliedBytes = Buffer.from(supplied);
+  if (expectedBytes.length !== suppliedBytes.length || !timingSafeEqual(expectedBytes, suppliedBytes)) {
+    throw new ClientRequestProblem('Diese Anfrage wurde abgelehnt.', 403);
   }
 }

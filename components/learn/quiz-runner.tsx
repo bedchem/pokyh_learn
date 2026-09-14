@@ -7,6 +7,7 @@ import { FormEvent, useState } from 'react';
 import { learnApi } from '@/lib/client/api';
 import { demoQuestions } from '@/lib/demo-data';
 import type { ReviewQuestion } from '@/lib/types';
+import { useLearnPreferences } from '@/components/providers/learn-preferences';
 
 type Feedback = {
   correct: boolean;
@@ -14,11 +15,12 @@ type Feedback = {
   explanation: string;
 };
 
-function normalise(value: string) {
-  return value.trim().toLocaleLowerCase('de').replace(/[.,!?;:]/g, '').replace(/\s+/g, ' ');
+function normalise(value: string, locale: string) {
+  return value.trim().toLocaleLowerCase(locale).replace(/[.,!?;:]/g, '').replace(/\s+/g, ' ');
 }
 
 export function QuizRunner({ questions = demoQuestions }: { questions?: ReviewQuestion[] }) {
+  const { locale, t } = useLearnPreferences();
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState('');
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -34,11 +36,11 @@ export function QuizRunner({ questions = demoQuestions }: { questions?: ReviewQu
     setError('');
 
     if (question.demoAcceptedAnswers) {
-      const correct = question.demoAcceptedAnswers.some((item) => normalise(item) === normalise(answer));
+      const correct = question.demoAcceptedAnswers.some((item) => normalise(item, locale) === normalise(answer, locale));
       setFeedback({
         correct,
         correctAnswer: question.demoAnswer,
-        explanation: question.demoExplanation || 'Die Übung wird im Demo-Modus lokal angezeigt.',
+        explanation: question.demoExplanation || t('quiz.demoExplanation'),
       });
       return;
     }
@@ -59,16 +61,16 @@ export function QuizRunner({ questions = demoQuestions }: { questions?: ReviewQu
         }),
       });
       const result = payload.results?.[0];
-      if (!result) throw new Error('Der Server hat kein Quiz-Ergebnis zurückgegeben.');
+      if (!result) throw new Error(t('quiz.noServerResult'));
       setFeedback({
         correct: result.correct,
         correctAnswer: result.correctAnswer,
         explanation: result.correct
-          ? 'Gespeichert. Die nächste Wiederholung plant der Server anhand deines Lernstands.'
-          : 'Gespeichert. Diese Karte kommt gezielt wieder, damit sie sich besser festigt.',
+          ? t('quiz.correctSaved')
+          : t('quiz.wrongSaved'),
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Die Antwort konnte nicht gespeichert werden.');
+      setError(cause instanceof Error ? cause.message : t('quiz.saveError'));
     } finally {
       setPending(false);
     }
@@ -91,25 +93,25 @@ export function QuizRunner({ questions = demoQuestions }: { questions?: ReviewQu
   }
 
   if (!questions.length) {
-    return <section className="quiz-finish panel"><span className="finish-orb"><Sparkles size={29} /></span><p className="eyebrow">Alles aufgeholt</p><h2>Für diesen Moment ist keine Wiederholung offen.</h2><p>Neue oder falsch beantwortete Wörter erscheinen hier automatisch, sobald der Server sie einplant.</p><Link className="button button--dark" href="/courses">Zu meinen Kursen <ChevronRight size={16} /></Link></section>;
+    return <section className="quiz-finish panel"><span className="finish-orb"><Sparkles size={29} /></span><p className="eyebrow">{t('quiz.caughtUp')}</p><h2>{t('quiz.emptyTitle')}</h2><p>{t('quiz.emptyBody')}</p><Link className="button button--dark" href="/courses">{t('quiz.toCourses')} <ChevronRight size={16} /></Link></section>;
   }
 
   if (finished) {
-    return <section className="quiz-finish panel"><span className="finish-orb"><Sparkles size={29} /></span><p className="eyebrow">Training beendet</p><h2>{correctCount} von {questions.length} Antworten waren richtig.</h2><p>Dein Ergebnis wurde pro Antwort serverseitig gespeichert. Schwierige Karten kommen gezielt wieder.</p><div><button className="button button--dark" type="button" onClick={restart}><RotateCcw size={16} /> Noch einmal</button><Link className="button button--soft" href="/dashboard">Zur Übersicht <ChevronRight size={16} /></Link></div></section>;
+    return <section className="quiz-finish panel"><span className="finish-orb"><Sparkles size={29} /></span><p className="eyebrow">{t('quiz.finished')}</p><h2>{t('quiz.result', { correct: String(correctCount), total: String(questions.length) })}</h2><p>{t('quiz.finishedBody')}</p><div><button className="button button--dark" type="button" onClick={restart}><RotateCcw size={16} /> {t('quiz.again')}</button><Link className="button button--soft" href="/dashboard">{t('quiz.toDashboard')} <ChevronRight size={16} /></Link></div></section>;
   }
 
   return <section className="quiz-shell">
-    <header className="quiz-head"><span>{index + 1} / {questions.length}</span><div className="quiz-progress"><i style={{ width: `${((index + 1) / questions.length) * 100}%` }} /></div><span className={`quiz-kind quiz-kind--${question.kind}`}>{question.kind === 'mistake' ? 'Fehler wiederholen' : question.kind === 'due' ? 'Fällig' : 'Neu'}</span></header>
+    <header className="quiz-head"><span>{index + 1} / {questions.length}</span><div className="quiz-progress"><i style={{ width: `${((index + 1) / questions.length) * 100}%` }} /></div><span className={`quiz-kind quiz-kind--${question.kind}`}>{question.kind === 'mistake' ? t('quiz.mistake') : question.kind === 'due' ? t('quiz.due') : t('quiz.new')}</span></header>
     <article className="quiz-card panel">
       <p className="section-kicker">{question.courseTitle}</p>
       <h1 lang={question.sourceLanguage}>{question.prompt}</h1>
       {question.hint && <p className="quiz-hint"><Lightbulb size={16} /> {question.hint}</p>}
       <form onSubmit={check}>
-        <label className="quiz-input-label" htmlFor="answer">Deine Antwort</label>
-        <div className="quiz-input-row"><input id="answer" autoComplete="off" autoFocus disabled={Boolean(feedback) || pending} value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Antwort eingeben" /><button className="button button--dark" disabled={!answer.trim() || Boolean(feedback) || pending} type="submit">{pending ? 'Prüft…' : <>Prüfen <Send size={16} /></>}</button></div>
+        <label className="quiz-input-label" htmlFor="answer">{t('quiz.answer')}</label>
+        <div className="quiz-input-row"><input id="answer" autoComplete="off" autoFocus disabled={Boolean(feedback) || pending} value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder={t('quiz.answerPlaceholder')} /><button className="button button--dark" disabled={!answer.trim() || Boolean(feedback) || pending} type="submit">{pending ? t('quiz.checking') : <>{t('quiz.check')} <Send size={16} /></>}</button></div>
       </form>
       {error && <p className="auth-error" role="alert">{error}</p>}
     </article>
-    {feedback && <section className={`feedback-card feedback-card--${feedback.correct ? 'correct' : 'wrong'}`} aria-live="polite"><span>{feedback.correct ? <Check size={22} /> : <X size={22} />}</span><div><b>{feedback.correct ? 'Richtig – gut gemacht.' : 'Fast. Die richtige Antwort ist:'}</b>{!feedback.correct && feedback.correctAnswer && <strong lang={question.targetLanguage}>{feedback.correctAnswer}</strong>}<p>{feedback.explanation}</p>{question.article && <small>Artikel: <b>{question.article}</b></small>}{question.example && <blockquote lang={question.targetLanguage}>{question.example}</blockquote>}</div><button className="button button--dark" type="button" onClick={next}>{index + 1 === questions.length ? 'Ergebnis' : 'Weiter'} <ChevronRight size={16} /></button></section>}
+    {feedback && <section className={`feedback-card feedback-card--${feedback.correct ? 'correct' : 'wrong'}`} aria-live="polite"><span>{feedback.correct ? <Check size={22} /> : <X size={22} />}</span><div><b>{feedback.correct ? t('quiz.correct') : t('quiz.wrong')}</b>{!feedback.correct && feedback.correctAnswer && <strong lang={question.targetLanguage}>{feedback.correctAnswer}</strong>}<p>{feedback.explanation}</p>{question.article && <small>{t('quiz.article')} <b>{question.article}</b></small>}{question.example && <blockquote lang={question.targetLanguage}>{question.example}</blockquote>}</div><button className="button button--dark" type="button" onClick={next}>{index + 1 === questions.length ? t('quiz.resultAction') : t('quiz.next')} <ChevronRight size={16} /></button></section>}
   </section>;
 }

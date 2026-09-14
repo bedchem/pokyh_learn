@@ -50,6 +50,9 @@ should privilege completion and validation status over decoration.
 
 Colors are roles, not content labels. Use the named tokens in
 `app/globals.css`; do not introduce scattered hex values in feature components.
+The visual system uses flat, solid surfaces—no gradients, glassmorphism or
+decorative AI-like texture. Light and dark themes are the same semantic system,
+not two unrelated skins.
 
 | Token family | Meaning | Appropriate use |
 | --- | --- | --- |
@@ -187,6 +190,8 @@ horizontal container with a clear disclosure or a card/detail pattern.
   `aria-hidden`; all meaningful content must remain in the semantic document.
 - Test each changed pattern at narrow phone, tablet, and wide desktop widths,
   plus keyboard-only and reduced-motion modes.
+- Keep product UI strings in German, English and Italian through the shared
+  locale system. Do not automatically translate author-created course content.
 
 ## Design review checklist
 

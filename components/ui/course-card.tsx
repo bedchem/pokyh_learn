@@ -1,16 +1,24 @@
+'use client';
+
 import { ArrowUpRight, BookOpen, Lock, Users } from 'lucide-react';
 import Link from 'next/link';
 
+import { useLearnPreferences } from '@/components/providers/learn-preferences';
 import type { Course } from '@/lib/types';
 
-const visibilityLabel = {
-  public: 'Katalog',
-  team: 'Team',
-  private: 'Privat',
-};
-
-export function CourseCard({ course, href, compact = false }: { course: Course; href?: string; compact?: boolean }) {
-  const target = href || `/catalog/${course.slug}`;
+export function CourseCard({
+  course,
+  href,
+  compact = false,
+  showProgress = true,
+}: {
+  course: Course;
+  href?: string;
+  compact?: boolean;
+  showProgress?: boolean;
+}) {
+  const { t } = useLearnPreferences();
+  const target = href || `/courses/${course.slug}`;
 
   return (
     <Link className={`course-card course-card--${course.accent} ${compact ? 'course-card--compact' : ''}`} href={target}>
@@ -23,12 +31,12 @@ export function CourseCard({ course, href, compact = false }: { course: Course; 
         <p>{course.description}</p>
       </div>
       <div className="course-card__meta">
-        <span><BookOpen size={14} /> {course.lessons} Lektionen</span>
-        <span>{course.visibility === 'team' ? <Users size={14} /> : <Lock size={13} />} {visibilityLabel[course.visibility]}</span>
+        <span><BookOpen size={14} /> {t('courseCard.lessons', { count: String(course.lessons) })}</span>
+        <span>{course.visibility === 'team' ? <Users size={14} /> : <Lock size={13} />} {t(`courseCard.${course.visibility}`)}</span>
       </div>
-      {typeof course.progress === 'number' && (
-        <div className="course-progress" aria-label={`${course.progress}% abgeschlossen`}>
-          <span><b>{course.progress}%</b> abgeschlossen</span>
+      {showProgress && typeof course.progress === 'number' && (
+        <div className="course-progress" aria-label={`${course.progress}% ${t('courseCard.complete')}`}>
+          <span><b>{course.progress}%</b> {t('courseCard.complete')}</span>
           <div className="progress-track"><i style={{ width: `${course.progress}%` }} /></div>
         </div>
       )}
