@@ -80,6 +80,12 @@ change as shared work. Do not delete, revert, rename, overwrite wholesale, or
   Learn administration, API-key lifecycle work, audit logging, validation,
   rate limits, Prisma models, and operational configuration examples. Do not
   alter existing Pokyh routes or any real `.env` file while working on Learn.
+- **Local integration verification (completed, uncommitted)**: the three
+  services were rebuilt and exercised together on 2026-09-14. The backend now
+  uses externally managed ingress rather than an in-container tunnel and
+  publishes its Compose port on `0.0.0.0`; see the factual, credential-free
+  worklog entry for test results. Preserve the production Learn legal gate and
+  do not alter a real environment file to bypass it.
 - **`pokyh-frontend`**: the existing legal information pages are being
   extended for the separate Learn product. Preserve the established Pokyh
   legal content and company/address fields; add reviewed Learn-specific copy
