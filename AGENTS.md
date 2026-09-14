@@ -76,6 +76,13 @@ change as shared work. Do not delete, revert, rename, overwrite wholesale, or
   oversized JSON, invalid idempotency headers, and unhelpful internal error
   output before a request is forwarded. Keep the backend as the authorization
   authority and do not relax its independent validation.
+- **Sign-in configuration and layout (completed, uncommitted)**: the Learn
+  sign-in screen reads the acknowledgement requirement, public notice URL, and
+  notice version from an API-key-protected backend endpoint at render time,
+  rather than duplicating a legal version in the frontend runtime. The privacy
+  checkbox has explicit compact geometry so generic text-input styles cannot
+  enlarge it. Release the backend endpoint and the Learn BFF change together;
+  an older backend must remain a fail-closed sign-in state.
 - **`pokyh-backend`**: additive `/learn` API, WebUntis-only identity boundary,
   Learn administration, API-key lifecycle work, audit logging, validation,
   rate limits, Prisma models, and operational configuration examples. Do not

@@ -323,8 +323,6 @@ settings area, with values such as:
 API_BACKEND_URL=https://api.pokyh.com
 API_BACKEND_KEY=server-only-value
 LEARN_API_PREFIX=/learn
-LEARN_PRIVACY_NOTICE_URL=https://pokyh.com/legal?view=learn
-LEARN_PRIVACY_NOTICE_VERSION=2026-09-12
 # Backend deployment value; direct browser calls to /learn are restricted here.
 LEARN_ALLOWED_ORIGINS=https://learn.pokyh.com
 ```
@@ -338,6 +336,12 @@ mounted and tested.
 Administrator-editable policy may include defaults, feature enablement, and
 retention windows, but may never expose, replace, or return an environment
 secret.
+
+The backend supplies the sign-in form's public notice URL and current version
+through its API-key-protected `GET /learn/sign-in-config` response. The Next.js
+server validates the response and fails closed if it is unavailable; it does
+not maintain a second frontend notice-version setting. The private WebUntis
+authorization reference never appears in that response.
 
 ### WebUntis / privacy activation boundary
 

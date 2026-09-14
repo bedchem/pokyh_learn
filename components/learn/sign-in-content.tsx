@@ -7,8 +7,9 @@ import { AuthForm } from '@/components/learn/auth-form';
 import { PreferenceControls } from '@/components/layout/preference-controls';
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
 import { BrandMark } from '@/components/ui/brand-mark';
+import type { LearnLegalConfig } from '@/lib/server/learn-legal-config';
 
-export function SignInContent({ legalConfig }: { legalConfig: { privacyNoticeUrl: string; privacyNoticeVersion: string } }) {
+export function SignInContent({ legalConfig }: { legalConfig: LearnLegalConfig }) {
   const { t } = useLearnPreferences();
 
   return (

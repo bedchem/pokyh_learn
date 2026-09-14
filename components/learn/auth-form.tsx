@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
+import type { LearnLegalConfig } from '@/lib/server/learn-legal-config';
 
-export function AuthForm({ legalConfig }: { legalConfig: { privacyNoticeUrl: string; privacyNoticeVersion: string } }) {
+export function AuthForm({ legalConfig }: { legalConfig: LearnLegalConfig }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLearnPreferences();
@@ -14,11 +15,11 @@ export function AuthForm({ legalConfig }: { legalConfig: { privacyNoticeUrl: str
   const [acknowledged, setAcknowledged] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const privacyConfigured = Boolean(legalConfig.privacyNoticeUrl && legalConfig.privacyNoticeVersion);
+  const privacyConfigured = !legalConfig.privacyRequired || Boolean(legalConfig.privacyNoticeUrl && legalConfig.privacyNoticeVersion);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!privacyConfigured || !acknowledged) {
+    if (!privacyConfigured || (legalConfig.privacyRequired && !acknowledged)) {
       setError(privacyConfigured ? t('auth.privacyRequired') : t('auth.privacyUnavailable'));
       return;
     }
@@ -57,9 +58,9 @@ export function AuthForm({ legalConfig }: { legalConfig: { privacyNoticeUrl: str
     <form className="auth-form" onSubmit={submit}>
       <label>{t('auth.username')}<span className="input-icon"><UserRound size={17} /></span><input name="username" autoComplete="username" minLength={1} maxLength={100} required placeholder="dein-name" /></label>
       <label>{t('auth.password')}<span className="input-icon"><LockKeyhole size={17} /></span><input name="password" type={visible ? 'text' : 'password'} autoComplete="current-password" minLength={1} maxLength={200} required placeholder="••••••••" /><button className="password-toggle" type="button" onClick={() => setVisible((value) => !value)} aria-label={visible ? t('auth.hidePassword') : t('auth.showPassword')}>{visible ? <EyeOff size={17} /> : <Eye size={17} />}</button></label>
-      {privacyConfigured ? <label className="auth-privacy"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /><span>{t('auth.privacyPrefix')} <a href={legalConfig.privacyNoticeUrl} target="_blank" rel="noreferrer">{t('auth.privacyLink')}</a>{' '}{t('auth.privacySuffix')}</span></label> : <p className="auth-privacy__missing">{t('auth.privacyUnavailable')}</p>}
+      {legalConfig.privacyRequired ? privacyConfigured ? <label className="auth-privacy"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /><span>{t('auth.privacyPrefix')} <a href={legalConfig.privacyNoticeUrl} target="_blank" rel="noreferrer">{t('auth.privacyLink')}</a>{' '}{t('auth.privacySuffix')}</span></label> : <p className="auth-privacy__missing">{t('auth.privacyUnavailable')}</p> : null}
       {error && <p className="auth-error" role="alert">{error}</p>}
-      <button className="button button--dark button--wide" disabled={pending || !privacyConfigured || !acknowledged} type="submit">{pending ? t('auth.checking') : t('auth.submit')} <ArrowRight size={16} /></button>
+      <button className="button button--dark button--wide" disabled={pending || !privacyConfigured || (legalConfig.privacyRequired && !acknowledged)} type="submit">{pending ? t('auth.checking') : t('auth.submit')} <ArrowRight size={16} /></button>
       <p className="auth-switch">{t('auth.noAccount')}</p>
     </form>
   );

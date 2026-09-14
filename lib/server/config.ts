@@ -49,26 +49,6 @@ export function getServerConfig() {
   };
 }
 
-/**
- * These values are intentionally public but read on the server at request
- * time. Using a `NEXT_PUBLIC_*` variable here would freeze the deployed notice
- * version into the Docker image at build time, which breaks runtime Compose
- * configuration and can show a stale legal notice.
- */
-export function getPublicLearnLegalConfig() {
-  const privacyNoticeUrl = process.env.LEARN_PRIVACY_NOTICE_URL?.trim() || '';
-  const privacyNoticeVersion = process.env.LEARN_PRIVACY_NOTICE_VERSION?.trim() || '';
-  let safeUrl = '';
-  try {
-    const url = new URL(privacyNoticeUrl);
-    const allowedProtocol = process.env.NODE_ENV === 'production' ? url.protocol === 'https:' : ['http:', 'https:'].includes(url.protocol);
-    if (allowedProtocol && url.hostname) safeUrl = url.toString();
-  } catch {
-    // Invalid configuration leaves sign-in unavailable rather than rendering an unsafe link.
-  }
-  return { privacyNoticeUrl: safeUrl, privacyNoticeVersion };
-}
-
 export function isDemoMode() {
   return process.env.NEXT_PUBLIC_LEARN_DEMO_MODE === 'true';
 }

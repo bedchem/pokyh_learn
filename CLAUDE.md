@@ -505,8 +505,6 @@ or production cookie.
 | `LEARN_API_TIMEOUT_MS` | server only | BFF backend deadline |
 | `LEARN_BFF_BODY_LIMIT_BYTES` | server only | bounded ordinary JSON body size accepted by the BFF |
 | `LEARN_BFF_IMPORT_BODY_LIMIT_BYTES` | server only | separately bounded library-import JSON body size accepted by the BFF |
-| `LEARN_PRIVACY_NOTICE_URL` | server runtime / safe public output | HTTPS legal notice URL passed to the sign-in form at request time |
-| `LEARN_PRIVACY_NOTICE_VERSION` | server runtime / safe public output | notice version matched by the backend before WebUntis verification |
 | `NEXT_PUBLIC_LEARN_DEMO_MODE` | local development only | enables static visual demo data |
 
 The production backend additionally configures at least:
@@ -524,6 +522,13 @@ The production backend additionally configures at least:
 Only deployment defaults and secrets belong in environment variables. Dynamic
 product policy belongs in the protected backend administration configuration,
 not in `NEXT_PUBLIC_*` browser values.
+
+The sign-in page fetches the acknowledgement requirement, public privacy-notice
+URL, and notice version from the API-key-protected backend
+`GET /learn/sign-in-config` endpoint at request time. It must fail closed when
+that response is missing or invalid. Do not add a parallel frontend
+`LEARN_PRIVACY_NOTICE_*` setting: the backend legal gate is the only authority
+for the version presented and submitted during WebUntis sign-in.
 
 ## Security Checklist
 

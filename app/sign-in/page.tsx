@@ -1,6 +1,6 @@
 import { SignInContent } from '@/components/learn/sign-in-content';
-import { getPublicLearnLegalConfig } from '@/lib/server/config';
+import { getAuthoritativeLearnLegalConfig } from '@/lib/server/learn-legal-config';
 
-export default function SignInPage() {
-  return <SignInContent legalConfig={getPublicLearnLegalConfig()} />;
+export default async function SignInPage() {
+  return <SignInContent legalConfig={await getAuthoritativeLearnLegalConfig()} />;
 }

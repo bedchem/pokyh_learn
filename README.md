@@ -72,17 +72,14 @@ mode. It is disabled by default and must never be enabled in production.
 | `LEARN_API_TIMEOUT_MS` | yes | BFF request deadline |
 | `LEARN_BFF_BODY_LIMIT_BYTES` | yes | maximum ordinary JSON body accepted by the public BFF |
 | `LEARN_BFF_IMPORT_BODY_LIMIT_BYTES` | yes | maximum JSON library-import body accepted by the public BFF |
-| `LEARN_PRIVACY_NOTICE_URL` | yes | runtime-read HTTPS Pokyh Learn privacy notice URL |
-| `LEARN_PRIVACY_NOTICE_VERSION` | yes | runtime-read notice version, matched by the backend login gate |
 | `NEXT_PUBLIC_LEARN_DEMO_MODE` | local only | renders non-production presentation data |
 
-`LEARN_PRIVACY_NOTICE_URL` and `LEARN_PRIVACY_NOTICE_VERSION` are required for
-the WebUntis sign-in form. They are public values but are read server-side at
-request time, so a Compose deployment can change a notice version without
-baking it into the image. They must match the backend's
-`LEARN_PRIVACY_NOTICE_*` configuration exactly. A production login remains
-intentionally unavailable until the backend also has its documented,
-non-secret WebUntis authorisation reference. Read
+The WebUntis sign-in form reads its required acknowledgement state, public
+notice URL, and current notice version at request time from the backend's
+API-key-protected Learn configuration. Do not duplicate those values in the
+frontend environment: the backend is the legal-gate authority. A production
+login remains intentionally unavailable until the backend also has its
+documented, non-secret WebUntis authorisation reference. Read
 [the legal readiness record](./docs/legal-readiness.md) before enabling the
 feature; configuration alone does not create a legal basis.
 

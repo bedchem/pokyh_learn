@@ -778,8 +778,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .auth-error { padding: 12px 13px; border: 1px solid color-mix(in srgb, var(--rose) 45%, var(--line)); border-radius: 12px; color: #a44261; background: var(--rose-wash); font-size: 12px; font-weight: 700; }
 .auth-switch { color: var(--ink-muted); text-align: center; font-size: 12px; line-height: 1.55; }
 .auth-switch a { color: #4e4a9f; font-weight: 800; }
-.auth-privacy { display: flex !important; align-items: flex-start; gap: 9px; color: var(--ink-muted) !important; font-size: 12px !important; font-weight: 600 !important; line-height: 1.45; }
-.auth-privacy input { width: 16px; height: 16px; flex: 0 0 auto; margin: 1px 0 0; accent-color: var(--violet); }
+.auth-privacy { display: flex !important; align-items: flex-start; min-height: 20px; gap: 9px; color: var(--ink-muted) !important; font-size: 12px !important; font-weight: 600 !important; line-height: 1.45; }
+/* This is a checkbox, not a text field. Reset the generic `.auth-form input`
+   geometry so the acknowledgement never inherits the large login-field size. */
+.auth-privacy input { box-sizing: border-box; width: 16px; min-width: 16px; height: 16px; min-height: 16px; padding: 0; flex: 0 0 16px; margin: 1px 0 0; border-radius: 4px; accent-color: var(--violet); cursor: pointer; }
+.auth-privacy span { min-width: 0; }
 .auth-privacy a { color: var(--violet); font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
 .auth-privacy__missing { padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 11px; color: var(--ink-muted); background: var(--surface-muted); font-size: 12px; }
 .not-found { display: grid; min-height: 100vh; align-content: center; justify-items: center; gap: 12px; padding: 30px; text-align: center; }
