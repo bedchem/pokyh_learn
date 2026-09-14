@@ -46,3 +46,18 @@ The production Learn gate remains deliberately closed until the backend
 operator supplies its required non-secret WebUntis authorisation reference,
 HTTPS privacy-notice URL, and notice version. Those values must not be guessed
 or substituted during development.
+
+## Production incident follow-up
+
+- A public `502` for `api.pokyh.com` was traced through the VPS reverse proxy
+  and NetBird route to the backend host. The route, database, cache, and
+  overlay connectivity were available; the API container was restarting before
+  it bound its port.
+- The direct cause was a deployment UI preserving quotes around
+  `TRUST_PROXY="loopback"`; body-size limits and other runtime values were
+  serialized the same way. Express and body-parser receive those quotes as
+  part of the value and reject them.
+- Backend configuration now removes one matching wrapping quote pair from its
+  runtime environment before reading settings. This preserves `false`, numeric
+  hop counts, named proxy ranges, and the safe direct-host default without
+  weakening proxy trust or altering unmatched quotes inside a value.
