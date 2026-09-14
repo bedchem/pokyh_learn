@@ -37,7 +37,7 @@ export function LandingContent() {
               <span><CheckCircle2 size={16} /> {t('landing.trustDevices')}</span>
             </div>
           </div>
-          <div className="landing-dashboard" data-motion="landing-dashboard" aria-label="Learning dashboard preview">
+          <div className="landing-dashboard" data-motion="landing-dashboard" aria-label={t('landing.previewLabel')}>
             <div className="landing-dashboard__top"><span className="landing-mini-logo">P</span><span>{t('landing.today')}</span><i /></div>
             <div className="landing-dashboard__body">
               <div className="landing-dashboard__summary">
@@ -49,7 +49,7 @@ export function LandingContent() {
               <div className="landing-dashboard__chart">
                 <span>{t('landing.rhythm')}</span>
                 <div>{[42, 58, 49, 73, 65, 88, 74].map((height, index) => <i data-motion="landing-bar" style={{ height: `${height}%` }} key={index} />)}</div>
-                <small>Mo &nbsp; Di &nbsp; Mi &nbsp; Do &nbsp; Fr &nbsp; Sa &nbsp; So</small>
+                <small>{t('landing.weekdays')}</small>
               </div>
               <div className="landing-dashboard__course"><span><BookOpen size={16} /> Italiano · A1</span><b>Artikel: il, lo, la</b><p><i /> 62% {t('landing.completed')}</p></div>
             </div>

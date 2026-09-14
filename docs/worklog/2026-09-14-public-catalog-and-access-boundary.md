@@ -77,3 +77,16 @@
 - Follow-up: A legacy `/favicon.ico` route responds with the same local product
   mark so browsers that do not use the generated icon endpoint also avoid a
   benign missing-resource diagnostic.
+
+## 2026-09-14 14:25 CEST — sign-in clarity and localised preview follow-up
+
+- Intent: Remove an avoidable, non-actionable sign-in attempt and make all
+  visible landing-preview interface text follow the selected UI language.
+- Outcome: The sign-in action remains disabled until the required privacy
+  acknowledgement is set. The dashboard-preview accessible name and weekday
+  labels are now provided by the existing German, English and Italian locale
+  dictionaries; authored Italian course example content remains intentionally
+  unchanged.
+- Verification: Covered by TypeScript and production-build checks after the
+  change; the sign-in form remains keyboard-operable and its native checkbox
+  supplies the enabling condition.

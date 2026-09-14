@@ -59,7 +59,7 @@ export function AuthForm({ legalConfig }: { legalConfig: { privacyNoticeUrl: str
       <label>{t('auth.password')}<span className="input-icon"><LockKeyhole size={17} /></span><input name="password" type={visible ? 'text' : 'password'} autoComplete="current-password" minLength={1} maxLength={200} required placeholder="••••••••" /><button className="password-toggle" type="button" onClick={() => setVisible((value) => !value)} aria-label={visible ? t('auth.hidePassword') : t('auth.showPassword')}>{visible ? <EyeOff size={17} /> : <Eye size={17} />}</button></label>
       {privacyConfigured ? <label className="auth-privacy"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /><span>{t('auth.privacyPrefix')} <a href={legalConfig.privacyNoticeUrl} target="_blank" rel="noreferrer">{t('auth.privacyLink')}</a>{' '}{t('auth.privacySuffix')}</span></label> : <p className="auth-privacy__missing">{t('auth.privacyUnavailable')}</p>}
       {error && <p className="auth-error" role="alert">{error}</p>}
-      <button className="button button--dark button--wide" disabled={pending || !privacyConfigured} type="submit">{pending ? t('auth.checking') : t('auth.submit')} <ArrowRight size={16} /></button>
+      <button className="button button--dark button--wide" disabled={pending || !privacyConfigured || !acknowledged} type="submit">{pending ? t('auth.checking') : t('auth.submit')} <ArrowRight size={16} /></button>
       <p className="auth-switch">{t('auth.noAccount')}</p>
     </form>
   );
