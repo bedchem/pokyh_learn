@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Home,
   LibraryBig,
+  LogOut,
   Menu,
   Search,
   Settings,
@@ -15,14 +16,14 @@ import {
   UsersRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 import { BrandMark } from '@/components/ui/brand-mark';
 import { Avatar } from '@/components/ui/avatar';
 import { PreferenceControls } from '@/components/layout/preference-controls';
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
-import { learnApi } from '@/lib/client/api';
+import { learnApi, logout } from '@/lib/client/api';
 
 export type CurrentIdentity = { username: string; isAdmin: boolean };
 
@@ -100,12 +101,42 @@ export function AppShell({
   initialIdentity?: CurrentIdentity | null;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const shortcutKeyLabel = useShortcutKeyLabel();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useLearnPreferences();
   const identity = useCurrentIdentity(initialIdentity);
+
+  useEffect(() => {
+    if (!workspaceMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(event.target as Node)) setWorkspaceMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setWorkspaceMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [workspaceMenuOpen]);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      router.push('/sign-in');
+      router.refresh();
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -151,11 +182,28 @@ export function AppShell({
         <BrandMark />
         <NavItems identity={identity} />
         {identity && <div className="sidebar__footer">
-          <Link href="/settings" className="sidebar-settings"><Settings size={18} /> {t('action.settings')}</Link>
-          <div className="user-mini">
-            <Avatar name={identity.username} size={33} />
-            <span><b>{identity.username}</b><small>{t('account.product')}</small></span>
-            <ChevronDown size={15} />
+          <div className="workspace-menu" ref={workspaceMenuRef}>
+            <button
+              type="button"
+              className="user-mini"
+              onClick={() => setWorkspaceMenuOpen((value) => !value)}
+              aria-haspopup="menu"
+              aria-expanded={workspaceMenuOpen}
+            >
+              <Avatar name={identity.username} size={33} />
+              <span><b>{identity.username}</b><small>{t('account.product')}</small></span>
+              <ChevronDown size={15} className={workspaceMenuOpen ? 'workspace-menu__chevron workspace-menu__chevron--open' : 'workspace-menu__chevron'} />
+            </button>
+            {workspaceMenuOpen && (
+              <div className="workspace-menu__panel" role="menu">
+                <Link href="/settings" role="menuitem" className="workspace-menu__item" onClick={() => setWorkspaceMenuOpen(false)}>
+                  <Settings size={16} /> {t('action.settings')}
+                </Link>
+                <button type="button" role="menuitem" className="workspace-menu__item workspace-menu__item--danger" onClick={() => void handleLogout()} disabled={loggingOut}>
+                  <LogOut size={16} /> {loggingOut ? t('action.loggingOut') : t('action.logout')}
+                </button>
+              </div>
+            )}
           </div>
         </div>}
       </aside>
@@ -169,6 +217,16 @@ export function AppShell({
         <div ref={menuRef} className="mobile-menu" role="dialog" aria-modal="true" aria-label={t('nav.primary')} data-lenis-prevent>
           <div className="mobile-menu__head"><BrandMark /><button data-menu-close className="icon-button" onClick={() => setMenuOpen(false)} aria-label={t('action.closeNavigation')}>×</button></div>
           <NavItems onNavigate={() => setMenuOpen(false)} identity={identity} />
+          {identity && (
+            <div className="mobile-menu__footer">
+              <Link href="/settings" className="workspace-menu__item" onClick={() => setMenuOpen(false)}>
+                <Settings size={16} /> {t('action.settings')}
+              </Link>
+              <button type="button" className="workspace-menu__item workspace-menu__item--danger" onClick={() => void handleLogout()} disabled={loggingOut}>
+                <LogOut size={16} /> {loggingOut ? t('action.loggingOut') : t('action.logout')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
