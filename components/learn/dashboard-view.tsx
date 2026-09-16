@@ -52,7 +52,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
           <h1>{t('dashboard.greeting', { name: data.displayName })}</h1>
           <p className="page-lead">{t('dashboard.lead')}</p>
         </div>
-        <div className="streak-pill" aria-label={t('dashboard.streakAria', { count: String(data.analytics.totals.streakDays) })}><Flame size={19} /><b>{data.analytics.totals.streakDays}</b><span>{t('dashboard.streak')}</span></div>
+        <Link className="streak-pill" href="/profile" aria-label={t('dashboard.streakAria', { count: String(data.analytics.totals.streakDays) })}><Flame size={19} /><b>{data.analytics.totals.streakDays}</b><span>{t('dashboard.streak')}</span></Link>
       </section>
 
       <section className="dashboard-grid dashboard-grid--top">

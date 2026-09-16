@@ -84,6 +84,28 @@ export const demoCourses: Course[] = [
   },
 ];
 
+// Synthetic 366-day activity for the demo profile heatmap. A deterministic
+// pseudo-random pattern (not Math.random, so the demo view is stable across
+// reloads) with roughly a third of days empty, matching a realistic streak.
+function demoYearActivity(): DashboardData['analytics']['yearActivity'] {
+  const days: DashboardData['analytics']['yearActivity'] = [];
+  const start = new Date('2026-09-12T12:00:00');
+  start.setDate(start.getDate() - 365);
+  for (let i = 0; i < 366; i += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    const pseudoRandom = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1;
+    const active = pseudoRandom > 0.35;
+    const answers = active ? Math.round(pseudoRandom * 18) + 1 : 0;
+    days.push({
+      dayKey: date.toISOString().slice(0, 10),
+      answers,
+      minutes: active ? Math.round(answers * 0.45) : 0,
+    });
+  }
+  return days;
+}
+
 export const demoDashboard: DashboardData = {
   displayName: 'Felix',
   dailyGoalMinutes: 20,
@@ -91,16 +113,17 @@ export const demoDashboard: DashboardData = {
     range: '7d',
     timezone: 'Europe/Rome',
     dataAvailableSince: '2026-09-01',
-    totals: { attempts: 28, answers: 86, correctAnswers: 72, accuracyPercent: 83.7, activeDays: 7, streakDays: 7 },
+    totals: { attempts: 28, answers: 86, correctAnswers: 72, accuracyPercent: 83.7, activeDays: 7, streakDays: 7, minutesLearned: 41 },
     days: [
-      { dayKey: '2026-09-06', attempts: 3, answers: 12, correctAnswers: 10 },
-      { dayKey: '2026-09-07', attempts: 4, answers: 14, correctAnswers: 12 },
-      { dayKey: '2026-09-08', attempts: 4, answers: 10, correctAnswers: 8 },
-      { dayKey: '2026-09-09', attempts: 5, answers: 17, correctAnswers: 14 },
-      { dayKey: '2026-09-10', attempts: 4, answers: 11, correctAnswers: 9 },
-      { dayKey: '2026-09-11', attempts: 4, answers: 13, correctAnswers: 11 },
-      { dayKey: '2026-09-12', attempts: 4, answers: 9, correctAnswers: 8 },
+      { dayKey: '2026-09-06', attempts: 3, answers: 12, correctAnswers: 10, minutes: 6 },
+      { dayKey: '2026-09-07', attempts: 4, answers: 14, correctAnswers: 12, minutes: 7 },
+      { dayKey: '2026-09-08', attempts: 4, answers: 10, correctAnswers: 8, minutes: 5 },
+      { dayKey: '2026-09-09', attempts: 5, answers: 17, correctAnswers: 14, minutes: 8 },
+      { dayKey: '2026-09-10', attempts: 4, answers: 11, correctAnswers: 9, minutes: 5 },
+      { dayKey: '2026-09-11', attempts: 4, answers: 13, correctAnswers: 11, minutes: 6 },
+      { dayKey: '2026-09-12', attempts: 4, answers: 9, correctAnswers: 8, minutes: 4 },
     ],
+    yearActivity: demoYearActivity(),
     queues: { due: 14, wrong: 6, fresh: 8, nextDueAt: '2026-09-13T08:00:00.000Z' },
     recommendation: { kind: 'due', count: 14, href: '/practice?queue=due' },
     courses: [],

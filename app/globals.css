@@ -214,6 +214,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .mobile-menu__footer { display: grid; gap: 4px; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); }
 
+.profile-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 17px; margin-bottom: 24px; }
+@media (max-width: 780px) { .profile-stats { grid-template-columns: 1fr; } }
+
+.contribution-heatmap { overflow-x: auto; padding-bottom: 4px; }
+.contribution-heatmap__months { display: flex; gap: 3px; margin-bottom: 6px; padding-left: 2px; font-size: 11px; color: var(--ink-muted); }
+.contribution-heatmap__months span { width: 11px; flex-shrink: 0; }
+.contribution-heatmap__grid { display: flex; gap: 3px; width: max-content; }
+.contribution-heatmap__week { display: flex; flex-direction: column; gap: 3px; }
+.contribution-heatmap__cell { width: 11px; height: 11px; border-radius: 3px; background: var(--surface-muted); }
+.contribution-heatmap__cell--pad { background: transparent; }
+.contribution-heatmap__cell--1 { background: color-mix(in srgb, var(--violet) 28%, var(--surface-muted)); }
+.contribution-heatmap__cell--2 { background: color-mix(in srgb, var(--violet) 52%, var(--surface-muted)); }
+.contribution-heatmap__cell--3 { background: color-mix(in srgb, var(--violet) 76%, var(--surface-muted)); }
+.contribution-heatmap__cell--4 { background: var(--violet); }
+.contribution-heatmap__legend { display: flex; align-items: center; gap: 4px; margin-top: 10px; font-size: 11px; color: var(--ink-muted); }
+.contribution-heatmap__legend .contribution-heatmap__cell { width: 10px; height: 10px; }
+
 .main-content { min-width: 0; }
 
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; width: min(1280px, 100%); height: 88px; margin: 0 auto; padding: 0 38px; }
@@ -240,7 +257,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 
 /* Dashboard */
-.streak-pill { display: flex; align-items: center; gap: 7px; padding: 10px 13px; border-radius: 13px; background: var(--sun-wash); color: #8b6426; font-size: 13px; }
+.streak-pill { display: flex; align-items: center; gap: 7px; padding: 10px 13px; border-radius: 13px; background: var(--sun-wash); color: #8b6426; font-size: 13px; transition: transform .15s ease; }
+
+.streak-pill:hover, .streak-pill:focus-visible { transform: translateY(-1px); }
 
 .streak-pill b { font-size: 17px; color: #70521f; }
 

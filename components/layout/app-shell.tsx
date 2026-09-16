@@ -49,7 +49,7 @@ const navigation: Array<{ href: string; labelKey: string; icon: typeof Home; adm
   { href: '/courses', labelKey: 'nav.courses', icon: BookOpen },
   { href: '/practice', labelKey: 'nav.practice', icon: Sparkles },
   { href: '/vocabulary', labelKey: 'nav.vocabulary', icon: BookMarked },
-  { href: '/teams', labelKey: 'nav.teams', icon: UsersRound, adminOnly: true },
+  { href: '/teams', labelKey: 'nav.teams', icon: UsersRound },
   { href: '/library', labelKey: 'nav.library', icon: LibraryBig },
 ];
 

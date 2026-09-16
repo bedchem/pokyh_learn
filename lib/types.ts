@@ -51,13 +51,21 @@ export interface LearningAnalytics {
     accuracyPercent: number | null;
     activeDays: number;
     streakDays: number;
+    // Real client-measured time, summed server-side — never estimated. See
+    // the dailyGoalMinutes comment on DashboardData below for why that
+    // distinction matters in this codebase.
+    minutesLearned: number;
   };
   days: Array<{
     dayKey: string;
     attempts: number;
     answers: number;
     correctAnswers: number;
+    minutes: number;
   }>;
+  // Always the trailing 366 days regardless of `range` — feeds a GitHub-style
+  // contribution heatmap independent of the selected range.
+  yearActivity: Array<{ dayKey: string; answers: number; minutes: number }>;
   queues: {
     due: number;
     wrong: number;

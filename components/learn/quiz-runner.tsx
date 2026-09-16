@@ -2,7 +2,7 @@
 
 import { Check, ChevronRight, Lightbulb, RotateCcw, Send, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
 import { learnApi } from '@/lib/client/api';
 import { demoQuestions } from '@/lib/demo-data';
@@ -27,6 +27,12 @@ export function QuizRunner({ questions = demoQuestions }: { questions?: ReviewQu
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [correctCount, setCorrectCount] = useState(0);
+  // Real time actively spent on the current question, start to submit — not
+  // an estimate. Date.now() is impure, so it can't run directly during
+  // render; the mount effect below sets the initial value, and
+  // next()/restart() (plain event handlers) reset it for each new question.
+  const questionStartedAt = useRef<number | null>(null);
+  useEffect(() => { questionStartedAt.current = Date.now(); }, []);
   const question = questions[index];
   const finished = index >= questions.length;
 
@@ -58,6 +64,7 @@ export function QuizRunner({ questions = demoQuestions }: { questions?: ReviewQu
           mode: question.kind === 'mistake' ? 'WRONG_ANSWERS' : 'REVIEW',
           idempotencyKey,
           answers: [{ entryId: question.id, answer, direction: question.direction }],
+          durationMs: questionStartedAt.current === null ? 0 : Date.now() - questionStartedAt.current,
         }),
       });
       const result = payload.results?.[0];
@@ -82,6 +89,7 @@ export function QuizRunner({ questions = demoQuestions }: { questions?: ReviewQu
     setAnswer('');
     setFeedback(null);
     setError('');
+    questionStartedAt.current = Date.now();
   }
 
   function restart() {
@@ -90,6 +98,7 @@ export function QuizRunner({ questions = demoQuestions }: { questions?: ReviewQu
     setFeedback(null);
     setError('');
     setCorrectCount(0);
+    questionStartedAt.current = Date.now();
   }
 
   if (!questions.length) {
