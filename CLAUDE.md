@@ -557,6 +557,11 @@ Before any release, check all of the following:
 
 ## Quality, Documentation, and Delivery Rules
 
+- Nothing may reach production until the complete relevant test checkpoint has
+  passed. Always test the changed behavior and the affected user flows before
+  release, including lint, type checking, production build, API/contract
+  checks, browser smoke checks, and unauthorized/error paths where applicable;
+  record any unavailable check and its release risk instead of bypassing it.
 - Prefer simple, maintainable, documented solutions over premature framework
   complexity.
 - Use clear, short English code comments only when a non-obvious decision needs

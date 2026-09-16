@@ -232,11 +232,11 @@ export async function getCatalog(): Promise<Course[]> {
   const payload = await backendFetch<{ courses: BackendCourse[] }>(pathFor('/catalog'), {
     next: { revalidate: 60, tags: ['learn-catalog'] },
   });
-  // Fail closed in the presentation layer as a defence-in-depth measure. The
-  // backend catalog endpoint applies the same predicate authoritatively.
-  return payload.courses
-    .filter((course) => course.visibility?.toLocaleUpperCase('en-US') === 'PUBLIC' && course.status?.toLocaleUpperCase('en-US') === 'PUBLISHED')
-    .map((course) => mapCourse(course));
+  // The backend endpoint is already scoped to PUBLIC + PUBLISHED courses and
+  // intentionally omits those authorization fields from its public card
+  // payload. Keep the known public state in the view model so cards render the
+  // correct label without reimplementing the backend's access predicate.
+  return payload.courses.map((course) => mapCourse({ ...course, visibility: 'PUBLIC', status: 'PUBLISHED' }));
 }
 
 export async function getCourse(slug: string, token?: string | null): Promise<Course | null> {
