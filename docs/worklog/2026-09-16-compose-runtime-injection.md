@@ -22,4 +22,5 @@
   configuration. Secrets are not committed. The hosted endpoint must be
   checked after redeploy; the current live `503` is an old/misconfigured
   runtime state, not evidence to bypass the legal gate.
-- Release state: ready for commit and push after the tested checkpoint
+- Release state: checkpoint committed as `304fc26` and pushed to `origin/main`;
+  hosted redeployment remains pending.
