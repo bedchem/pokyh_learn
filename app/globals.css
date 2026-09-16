@@ -778,10 +778,47 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .auth-error { padding: 12px 13px; border: 1px solid color-mix(in srgb, var(--rose) 45%, var(--line)); border-radius: 12px; color: #a44261; background: var(--rose-wash); font-size: 12px; font-weight: 700; }
 .auth-switch { color: var(--ink-muted); text-align: center; font-size: 12px; line-height: 1.55; }
 .auth-switch a { color: #4e4a9f; font-weight: 800; }
-.auth-privacy { display: flex !important; align-items: flex-start; min-height: 20px; gap: 9px; color: var(--ink-muted) !important; font-size: 12px !important; font-weight: 600 !important; line-height: 1.45; }
-/* This is a checkbox, not a text field. Reset the generic `.auth-form input`
-   geometry so the acknowledgement never inherits the large login-field size. */
-.auth-privacy input { box-sizing: border-box; width: 16px; min-width: 16px; height: 16px; min-height: 16px; padding: 0; flex: 0 0 16px; margin: 1px 0 0; border-radius: 4px; accent-color: var(--violet); cursor: pointer; }
+.auth-privacy { display: flex !important; align-items: flex-start !important; min-height: 20px; gap: 9px !important; color: var(--ink-muted) !important; font-size: 12px !important; font-weight: 600 !important; line-height: 1.45; position: static !important; }
+/* This is a checkbox, not a text field: reset the generic `.auth-form input`
+   geometry, and fully replace the browser's native checkbox rendering
+   (appearance/theme varies a lot per OS/browser, which reads as visually
+   "off" next to this app's otherwise fully custom-styled controls) with a
+   small custom box + checkmark, so it looks identical everywhere. */
+.auth-privacy input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  margin: 1px 0 0;
+  flex: 0 0 18px;
+  display: inline-grid;
+  place-content: center;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.auth-privacy input[type="checkbox"]::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  background: #fff;
+  transform: scale(0);
+  transition: transform .12s ease;
+}
+.auth-privacy input[type="checkbox"]:checked {
+  border-color: var(--violet);
+  background: var(--violet);
+}
+.auth-privacy input[type="checkbox"]:checked::after { transform: scale(1); }
+.auth-privacy input[type="checkbox"]:hover { border-color: var(--violet); }
+.auth-privacy input[type="checkbox"]:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
 .auth-privacy span { min-width: 0; }
 .auth-privacy a { color: var(--violet); font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
 .auth-privacy__missing { padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 11px; color: var(--ink-muted); background: var(--surface-muted); font-size: 12px; }
