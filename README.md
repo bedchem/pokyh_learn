@@ -113,13 +113,12 @@ LEARN_BIND_ADDRESS=127.0.0.1
 ```
 
 Compose reads `.env` by default. To use a separately managed runtime file
-without changing the project file, select it for both Compose interpolation and
-the container's `env_file` input. This keeps a non-default `PORT` and the
-runtime configuration in the same private file:
+without changing the project file, select it with `--env-file`. Compose passes
+the explicitly required runtime values into the container and fails early with
+the missing variable name if one is absent:
 
 ```bash
-LEARN_ENV_FILE=/secure/path/learn.env \
-  docker compose --env-file /secure/path/learn.env up --build -d
+docker compose --env-file /secure/path/learn.env up --build -d
 ```
 
 The image contains no `.env` files and accepts secrets only at container

@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # Build the standalone Next.js server without copying runtime configuration or
 # credentials into the image. Configuration is supplied only when the
 # container starts.

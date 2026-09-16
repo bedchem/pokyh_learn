@@ -8,16 +8,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    env_file:
-      # Preserve literal secret characters in the operator-owned runtime file;
-      # Compose's interpolation belongs only to non-sensitive container wiring.
-      - path: ${LEARN_ENV_FILE:-.env}
-        required: true
-        format: raw
     environment:
       NODE_ENV: production
       PORT: ${PORT:-3005}
       HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}
+      API_BACKEND_URL: ${API_BACKEND_URL:?API_BACKEND_URL is required}
+      API_BACKEND_KEY: ${API_BACKEND_KEY:?API_BACKEND_KEY is required}
+      LEARN_SESSION_COOKIE_NAME: ${LEARN_SESSION_COOKIE_NAME:?LEARN_SESSION_COOKIE_NAME is required}
+      LEARN_REFRESH_COOKIE_NAME: ${LEARN_REFRESH_COOKIE_NAME:?LEARN_REFRESH_COOKIE_NAME is required}
+      LEARN_CSRF_COOKIE_NAME: ${LEARN_CSRF_COOKIE_NAME:?LEARN_CSRF_COOKIE_NAME is required}
+      NEXT_PUBLIC_LEARN_CSRF_COOKIE_NAME: ${NEXT_PUBLIC_LEARN_CSRF_COOKIE_NAME:?NEXT_PUBLIC_LEARN_CSRF_COOKIE_NAME is required}
+      LEARN_COOKIE_DOMAIN: ${LEARN_COOKIE_DOMAIN:-}
+      LEARN_API_PREFIX: ${LEARN_API_PREFIX:?LEARN_API_PREFIX is required}
+      NEXT_PUBLIC_LEARN_DEMO_MODE: ${NEXT_PUBLIC_LEARN_DEMO_MODE:?NEXT_PUBLIC_LEARN_DEMO_MODE is required}
+      LEARN_API_TIMEOUT_MS: ${LEARN_API_TIMEOUT_MS:?LEARN_API_TIMEOUT_MS is required}
+      LEARN_BFF_BODY_LIMIT_BYTES: ${LEARN_BFF_BODY_LIMIT_BYTES:?LEARN_BFF_BODY_LIMIT_BYTES is required}
+      LEARN_BFF_IMPORT_BODY_LIMIT_BYTES: ${LEARN_BFF_IMPORT_BODY_LIMIT_BYTES:?LEARN_BFF_IMPORT_BODY_LIMIT_BYTES is required}
     ports:
       # Publish on the selected interface; put TLS/reverse-proxy policy in
       # front of the container for the public learn.pokyh.com deployment.
