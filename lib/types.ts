@@ -139,6 +139,10 @@ export interface Team {
   description: string;
   memberCount: number;
   role: 'owner' | 'admin' | 'member';
+  // True only for this team's actual OWNER or a platform administrator —
+  // narrower than `role === 'admin'`, which also covers a team MANAGER who
+  // cannot add members. Gates the member-management UI.
+  canManageMembers: boolean;
   courseCount: number;
   accent: string;
 }

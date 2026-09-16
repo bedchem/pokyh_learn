@@ -1,0 +1,151 @@
+# 2026-09-16 — Teams/courses admin, team-scoped vocab, UX/visual audit
+
+## Intent
+
+User request (verbatim, translated from German, received mid-session with
+4 annotated screenshots of `learn.pokyh.com/teams` and `/dashboard`):
+
+1. Courses aren't visible somewhere they should be; add course view/edit/
+   delete to the `pokyh-backend` admin panel (`LearnCoursesPage.tsx` exists
+   but courses "don't show up").
+2. Add a way to make someone the owner of a team (ownership transfer),
+   in the backend admin.
+3. Predefined Italian + English vocabulary should exist as a course each
+   (not just raw vocab entries).
+4. Vocabulary must be strictly team-scoped: each team only sees/edits its
+   own vocab, never another team's.
+5. The vocab entry-checking pipeline (translation correctness + spelling)
+   must actually work — this is the existing `LEARN_DICTIONARY_*` MyMemory
+   adapter described in this repo's own `CLAUDE.md`
+   ("Current provider strategy" section) — verify/complete it, don't build
+   a second system.
+6. Settings page (`/settings` on learn.pokyh.com) needs genuinely useful
+   content, reorganized as a clean submenu under the workspace-switcher
+   button shown in the screenshot (the "plat-feli / POKYHlearn" card with
+   a chevron).
+7. Full visual/contrast audit — screenshots show barely-legible text (e.g.
+   the Teams page card: white/pink card, near-invisible "ADMIN" crown
+   label, team name, and member count).
+8. Team/group **creation** must only be possible from the `api.pokyh.com`
+   backend admin panel when logged in as a Pokyh administrator — remove/
+   hide the "+ Neue Gruppe" create action on `learn.pokyh.com/teams`
+   entirely for normal users. This matches this repo's own `CLAUDE.md`:
+   "group creation ... are canonical Pokyh administrator actions."
+9. Team **owners** (not admins) should be able to add members to their
+   *existing* team directly on `learn.pokyh.com`, via a dropdown + search
+   field to find users. This is a deliberate product decision from the
+   user, narrower than #8 (creation stays admin-only; membership addition
+   on an existing team becomes owner-capable) — needs new, carefully
+   server-enforced authorization (owner of *that* team only, never other
+   teams) since it's new write surface.
+10. The `⌘K` search-shortcut hint should be OS-aware (show `Ctrl+K` on
+    Windows/Linux, `⌘K` only on macOS).
+11. The dashboard's "Lernrhythmus" graph is empty/non-functional — make it
+    show real data. Add a profile view with streak, total minutes learned,
+    and a GitHub-contributions-style heatmap of quiz minutes per day.
+
+User's own words on process: "TESTE alles dann push es in prod!",
+"DURCHDENKE ES", "SCHREIB DEN PLAN IRGENDWO HIN DASS DU IHN NICHT
+VERGISST" — hence this file. Standing rules from earlier in this session
+still apply: no AI co-author trailer on commits, confirm scope + git
+identity before each commit, protocol everything, never delete another
+agent's unfamiliar work.
+
+## Repos touched
+
+- `pokyh-backend` — admin course view/edit/delete, team-ownership
+  transfer, owner-add-member authorization endpoint, dictionary
+  verification completion if needed.
+- `pokyh_learn-frontend` — courses-not-visible bug, team-scoped vocab UI,
+  predefined IT/EN vocab courses, settings redesign, contrast audit,
+  remove team-create UI, add owner add-member UI (dropdown+search),
+  OS-aware shortcut hint, dashboard graph + profile/streak/heatmap.
+
+## Execution order (by risk/dependency, not necessarily user's listed order)
+
+1. Investigate why courses don't show (likely a real bug — do this first,
+   it blocks understanding several other items).
+2. Visual/contrast audit + team-create-button removal (concrete, low-risk,
+   already screenshotted).
+3. Admin: course view/edit/delete + team ownership transfer.
+4. Backend: owner-can-add-member endpoint (new authorization surface —
+   needs careful server-side ownership check).
+5. Frontend: add-member dropdown+search UI wired to #4.
+6. Team-scoped vocab enforcement audit (check current scoping is real,
+   not just UI-level).
+7. Predefined IT/EN vocab-as-course seeding.
+8. Dictionary verification (translation+spelling) completion/audit.
+9. Settings page redesign.
+10. OS-aware shortcut hint (small, isolated).
+11. Dashboard graph real data + profile/streak/contribution-heatmap (largest
+    net-new feature — last, since it's additive and lowest-risk to defer).
+
+## Status
+
+### Done (this batch)
+
+- Investigated item 1: `pokyh-backend/admin/src/pages/LearnCoursesPage.tsx`
+  already has full view/status-lifecycle/delete/direct-access-grant
+  management — it existed but was **unwired** (no route, no sidebar entry)
+  before this session's earlier backup-system commit (`149941e`), which
+  wired it in. No further backend admin course work needed; the fix is
+  already pushed, pending a production deploy.
+- Item 7 (partial): root-caused and fixed the Teams page contrast bug —
+  `.team-card--coral`/`--lavender` used hardcoded light-only hex colors
+  instead of the theme-aware `--rose-wash`/`--violet-wash` variables
+  `.course-card` already uses, so in dark mode the card background never
+  switched while its near-white `--ink` text did, producing near-invisible
+  text. Fixed both backgrounds plus `.team-role`'s hardcoded grey (now
+  `var(--ink-muted)`).
+- Item 8: removed the "+ Neue Gruppe" create card from
+  `components/learn/teams-view.tsx` and the empty-state's create CTA;
+  deleted `app/teams/new/page.tsx` and `components/learn/team-create-form.tsx`
+  entirely (server-side authorization already correctly restricted creation
+  to platform admins via `requireLearnAdmin` in both `POST /learn/teams`
+  routes — this was a UI/product cleanup, not a security fix).
+- Item 2: ownership transfer **did not exist at all** — closer reading
+  found both `teamRoleSchema` (learn.ts) and `adminLearnTeamMemberSchema`
+  (admin.ts) only ever accepted `MANAGER`/`MEMBER`, and the admin UI's role
+  dropdown never offered `OWNER` as an option. Added a dedicated
+  `POST /api/admin/learn/teams/:teamId/owner` endpoint (admin.ts) that
+  transactionally promotes the target to OWNER and demotes any other
+  current OWNER(s) to MANAGER, plus a "Eigentümer" button in
+  `LearnTeamsPage.tsx` next to each non-owner member.
+- Item 9: found `/teams` and `/teams/[slug]` were **entirely platform-admin-
+  gated** (`requireLearnAdministrator`) even though the backend's
+  `GET /learn/teams` already correctly scoped results per-user — meaning no
+  real team owner could reach their own team page at all before this fix.
+  Changed both pages to `requireLearnUser`. Added backend support: a
+  `isTeamOwner()` helper, relaxed `POST /learn/teams/:teamId/members` to
+  allow the team's own OWNER (never MANAGER, never another team — role
+  stays restricted to MANAGER/MEMBER, OWNER stays admin-only via the
+  dedicated transfer endpoint above), and two new read routes,
+  `GET /learn/teams/:teamId/members` (full roster, any current member or
+  admin) and `GET /learn/teams/:teamId/candidate-members?q=` (owner/admin-
+  only WebUntis-verified user search, minimal fields, excludes existing
+  members). Built `components/learn/team-member-manager.tsx` (roster list +
+  search/select/add-with-role UI, gated by the new `Team.canManageMembers`
+  field) and wired it into `/teams/[slug]`.
+- Verified (pokyh-backend, per separate user follow-up about backup
+  completeness): `mysqldump` has no table filter anywhere, so it already
+  backs up every table including the school-year archive tables
+  (ArchivedUser/ArchivedClass/ArchivedTodo/ArchivedReminder) — documented
+  this in a code comment rather than changing behavior.
+
+Verification: `npx tsc --noEmit`, `npm run lint`, `npm run build` all pass
+clean in `pokyh_learn-frontend`; `npx tsc --noEmit` clean in `pokyh-backend`
+and its `admin/` SPA. Could not do an interactive browser check of the new
+`/teams` flow specifically — it requires a real authenticated session and
+demo mode does not bypass the page-level session gate (only affects data
+fetching), so this remains a known gap until a real login is available to
+test against; flagging rather than claiming full verification.
+
+### Not started yet (still pending from the original list)
+
+3. Predefined Italian + English vocabulary courses.
+4. Team-scoped vocab enforcement audit.
+5. Dictionary verification (translation+spelling) completion/audit.
+6. Settings page redesign.
+7. Visual/contrast audit (remaining surfaces beyond the Teams page card).
+10. OS-aware `⌘K`/`Ctrl+K` shortcut hint.
+11. Dashboard graph real data + profile/streak/contribution-heatmap.

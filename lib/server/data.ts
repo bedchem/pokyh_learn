@@ -355,6 +355,7 @@ export async function getTeams(token?: string | null): Promise<Team[]> {
     role: team.members[0]?.role === 'OWNER'
       ? 'owner'
       : (team.members[0]?.role === 'MANAGER' || payload.isAdmin) ? 'admin' : 'member',
+    canManageMembers: team.members[0]?.role === 'OWNER' || Boolean(payload.isAdmin),
     courseCount: team._count.courses,
     accent: accentFor(team.id),
   }));
