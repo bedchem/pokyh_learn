@@ -1,0 +1,8 @@
+# Compatibility entrypoint for deployment systems that only look for the
+# legacy Docker Compose filename. Keep the service definition in compose.yaml
+# so both `docker compose` defaults and Dokploy use the same configuration.
+services:
+  frontend:
+    extends:
+      file: compose.yaml
+      service: frontend
