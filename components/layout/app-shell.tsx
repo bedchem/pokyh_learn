@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 import { BrandMark } from '@/components/ui/brand-mark';
 import { Avatar } from '@/components/ui/avatar';
@@ -72,6 +72,26 @@ function NavItems({ onNavigate, identity }: { onNavigate?: () => void; identity:
   );
 }
 
+// The platform never changes during a session, so there is nothing to
+// subscribe to — matching this file's own useSyncExternalStore pattern for
+// system theme (see LearnPreferencesProvider) rather than a state+effect,
+// which avoids a hydration mismatch without an extra render after mount.
+function subscribeToPlatform() {
+  return () => {};
+}
+
+function readIsApplePlatform(): boolean {
+  type UaData = { platform?: string };
+  const uaData = (navigator as Navigator & { userAgentData?: UaData }).userAgentData;
+  const platform = uaData?.platform ?? navigator.platform ?? navigator.userAgent;
+  return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+function useShortcutKeyLabel(): string {
+  const isApple = useSyncExternalStore(subscribeToPlatform, readIsApplePlatform, (): boolean => true);
+  return isApple ? '⌘ K' : 'Strg K';
+}
+
 export function AppShell({
   children,
   initialIdentity,
@@ -80,6 +100,7 @@ export function AppShell({
   initialIdentity?: CurrentIdentity | null;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const shortcutKeyLabel = useShortcutKeyLabel();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -154,7 +175,7 @@ export function AppShell({
       <main className="main-content" id="main-content" aria-hidden={menuOpen || undefined} inert={menuOpen || undefined}>
         <div className="topbar">
           {identity && <>
-            <Link href="/catalog" className="search-trigger" aria-label={t('action.search')}><Search size={18} /><span>{t('action.search')}</span><kbd>⌘ K</kbd></Link>
+            <Link href="/catalog" className="search-trigger" aria-label={t('action.search')}><Search size={18} /><span>{t('action.search')}</span><kbd>{shortcutKeyLabel}</kbd></Link>
             <div className="topbar__actions">
               <PreferenceControls compact />
               <Link href="/create/course" className="button button--dark button--small"><GraduationCap size={16} /> {t('action.createCourse')}</Link>
