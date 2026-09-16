@@ -140,12 +140,56 @@ demo mode does not bypass the page-level session gate (only affects data
 fetching), so this remains a known gap until a real login is available to
 test against; flagging rather than claiming full verification.
 
-### Not started yet (still pending from the original list)
+### Done (second batch, same day)
 
-3. Predefined Italian + English vocabulary courses.
-4. Team-scoped vocab enforcement audit.
-5. Dictionary verification (translation+spelling) completion/audit.
-6. Settings page redesign.
-7. Visual/contrast audit (remaining surfaces beyond the Teams page card).
-10. OS-aware `⌘K`/`Ctrl+K` shortcut hint.
-11. Dashboard graph real data + profile/streak/contribution-heatmap.
+- Item 4: audited team-scoped vocabulary isolation — already correctly
+  enforced. Vocabulary belongs to a course, not a team directly, and
+  `resolveCourseAccess` in learn.ts only grants VIEW on a `TEAM`-visibility
+  course to actual members of `course.teamId`. No gap found.
+- Item 3: added `seedStarterVocabCourses()` (admin.ts) — every new team
+  gets an Italian and an English `TEAM`-visibility vocabulary course
+  automatically (idempotent, keyed by team+language), plus a "Vokabelkurse
+  anlegen" admin action to backfill teams created before this existed.
+- Item 5: audited — already fully built end-to-end (`/vocabulary/lookup`,
+  `/vocabulary/validate`, `/vocabulary/:id/verify` routes; `learnDictionary.ts`
+  reads live from the DB-backed `LearnConfig`, not just env; admin UI toggle
+  already exists on the "Learn" config page). Both `dictionaryEnabled` and
+  `dictionaryValidationEnabled` default to `false` — this needs an admin to
+  flip two toggles in production, not more code. Flagged rather than
+  claimed fixed, since no production admin credentials were available here.
+- Item 10: `⌘ K` was hardcoded regardless of OS. Now detects the platform
+  client-side (`useSyncExternalStore`, matching this file's own system-theme
+  pattern) and shows "Strg K" on non-Apple platforms.
+- Item 6: the sidebar's username/avatar card had a decorative chevron with
+  no click handler at all — did nothing. Turned into a real dropdown
+  (Settings + a first-ever Log out action — the BFF route existed but had
+  no UI trigger anywhere, on any screen size) and added the same to the
+  mobile nav overlay, since the desktop sidebar is hidden below 780px.
+- Item 11: added real, client-measured `durationMs` to quiz attempts
+  (per-question timing, sanity-capped server-side at 3h — never estimated),
+  aggregated into `LearnActivityDaily`, exposed as `totals.minutesLearned`
+  and a new `yearActivity` field (trailing 366 days, independent of the
+  requested range). Built `/profile`: streak, real minutes learned, active
+  days, and a GitHub-style contribution heatmap, linked from the
+  dashboard's streak pill. The existing "Lernrhythmus" dashboard chart was
+  already wired to real data — it showed zeros only because the test
+  account had no quiz history yet (same empty-state pattern as the earlier
+  catalog investigation, not a bug).
+- Found and fixed one regression from the earlier `/teams` access fix: the
+  sidebar nav still hid the "Teams" link behind `adminOnly: true` even
+  though the page itself was already opened to every authenticated user.
+
+Verification: `npx tsc --noEmit`, `npm run lint`, `npm run build` all clean
+in `pokyh_learn-frontend`; `npx tsc --noEmit` and `npm run build` clean in
+`pokyh-backend`. Same known gap as the first batch: no real authenticated
+session available here to browser-test `/profile` or the workspace-menu
+dropdown interactively — verified by strict typecheck/lint/build only.
+
+### Remaining (not done)
+
+7. Visual/contrast audit beyond the Teams card fixed in the first batch —
+   no further specific reports came in; would need either more screenshots
+   or a live authenticated walkthrough to find anything else.
+5. (action item, not code) An admin needs to enable `dictionaryEnabled` and
+   `dictionaryValidationEnabled` on the Learn config admin page for the
+   translation/spelling-check feature to actually respond to users.
