@@ -22,6 +22,8 @@ type VocabularyResponse = {
   canEdit?: boolean;
 };
 
+type WordValidationReasonCode = 'no_vowel' | 'triple_repeat' | 'consonant_run' | 'near_duplicate' | 'no_issue_found';
+
 type WordValidation = {
   provider: 'dictionaryapi' | 'local';
   language: string;
@@ -32,7 +34,24 @@ type WordValidation = {
   cached: boolean;
   stale: boolean;
   message: string | null;
+  // Machine-readable outcome of the local, dependency-free spelling check
+  // (see learnDictionary.ts on the backend) — translated client-side rather
+  // than shown as the backend's raw English message. Null for a result that
+  // came from the external dictionary API instead.
+  reasonCode: WordValidationReasonCode | null;
+  similarWord: string | null;
 };
+
+function localValidationReason(t: (key: string, vars?: Record<string, string>) => string, validation: WordValidation): string | null {
+  switch (validation.reasonCode) {
+    case 'no_vowel': return t('vocab.reasonNoVowel');
+    case 'triple_repeat': return t('vocab.reasonTripleRepeat');
+    case 'consonant_run': return t('vocab.reasonConsonantRun');
+    case 'near_duplicate': return t('vocab.reasonNearDuplicate', { word: validation.similarWord ?? '' });
+    case 'no_issue_found': return t('vocab.reasonNoIssueFound');
+    default: return null;
+  }
+}
 
 function languageCode(language: string) {
   const normalized = language.toLocaleLowerCase('de-DE');
@@ -145,13 +164,15 @@ export function VocabularyWorkspace({
         }),
       });
       setDraftValidation(payload.validation);
-      const key = payload.validation.status === 'verified'
-        ? 'vocab.wordValidated'
-        : payload.validation.status === 'not_found'
-          ? 'vocab.wordNotFound'
-          : payload.validation.status === 'unavailable'
-            ? 'vocab.wordCheckOffline'
-            : 'vocab.wordManualReview';
+      const key = payload.validation.provider === 'local'
+        ? (payload.validation.status === 'not_found' ? 'vocab.wordLocalTypo' : 'vocab.wordLocalOk')
+        : payload.validation.status === 'verified'
+          ? 'vocab.wordValidated'
+          : payload.validation.status === 'not_found'
+            ? 'vocab.wordNotFound'
+            : payload.validation.status === 'unavailable'
+              ? 'vocab.wordCheckOffline'
+              : 'vocab.wordManualReview';
       setNotice(t(key));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : t('vocab.wordCheckError'));
@@ -256,7 +277,7 @@ export function VocabularyWorkspace({
 
     {notice && <div className="inline-notice" role="status"><Sparkles size={16} /> {notice}<button type="button" onClick={() => setNotice(null)} aria-label={t('vocab.dismiss')}>×</button></div>}
 
-    {showForm && <section className="word-form panel"><div><p className="section-kicker">{t('vocab.newEntry')}</p><h2>{t('vocab.oneWord')}</h2><p>{t('vocab.oneWordBody')}</p></div><form onSubmit={addWord}><label>{t('vocab.word')}<input name="sourceText" value={draftWord} onChange={(event) => { setDraftWord(event.target.value); setDraftValidation(null); }} lang={languageCode(selectedCourse?.language || '')} placeholder={selectedCourse?.language.includes('Italien') ? 'es. stazione' : selectedCourse?.language.includes('Engl') ? 'e.g. delay' : t('vocab.wordPlaceholder')} required autoFocus /></label>{draftValidation && <div className="inline-notice" role="status"><Sparkles size={16} /><span><b>{draftValidation.status === 'verified' ? t('vocab.wordValidated') : draftValidation.status === 'not_found' ? t('vocab.wordNotFound') : draftValidation.status === 'unavailable' ? t('vocab.wordCheckOffline') : t('vocab.wordManualReview')}</b>{draftValidation.partOfSpeech && <> · {draftValidation.partOfSpeech}</>}{draftValidation.definition && <><br />{draftValidation.definition}</>}{draftValidation.example && <><br /><em>“{draftValidation.example}”</em></>}</span></div>}<div className="word-form__actions"><button type="button" className="button button--soft" disabled={draftValidationPending || !draftWord.trim()} onClick={() => void validateDraftWord()}><SearchCheck size={16} /> {draftValidationPending ? t('vocab.checking') : t('vocab.checkWord')}</button><button type="button" className="button button--plain" disabled={pending || draftValidationPending} onClick={() => { setShowForm(false); setDraftWord(''); setDraftValidation(null); }}>{t('vocab.cancel')}</button><button type="submit" className="button button--dark" disabled={pending || draftValidationPending}><CheckCircle2 size={16} /> {pending ? t('vocab.saving') : t('vocab.save')}</button></div></form></section>}
+    {showForm && <section className="word-form panel"><div><p className="section-kicker">{t('vocab.newEntry')}</p><h2>{t('vocab.oneWord')}</h2><p>{t('vocab.oneWordBody')}</p></div><form onSubmit={addWord}><label>{t('vocab.word')}<input name="sourceText" value={draftWord} onChange={(event) => { setDraftWord(event.target.value); setDraftValidation(null); }} lang={languageCode(selectedCourse?.language || '')} placeholder={selectedCourse?.language.includes('Italien') ? 'es. stazione' : selectedCourse?.language.includes('Engl') ? 'e.g. delay' : t('vocab.wordPlaceholder')} required autoFocus /></label>{draftValidation && <div className="inline-notice" role="status"><Sparkles size={16} /><span><b>{draftValidation.provider === 'local' ? (draftValidation.status === 'not_found' ? t('vocab.wordLocalTypo') : t('vocab.wordLocalOk')) : draftValidation.status === 'verified' ? t('vocab.wordValidated') : draftValidation.status === 'not_found' ? t('vocab.wordNotFound') : draftValidation.status === 'unavailable' ? t('vocab.wordCheckOffline') : t('vocab.wordManualReview')}</b>{draftValidation.partOfSpeech && <> · {draftValidation.partOfSpeech}</>}{draftValidation.definition && <><br />{draftValidation.definition}</>}{draftValidation.example && <><br /><em>“{draftValidation.example}”</em></>}{localValidationReason(t, draftValidation) && <><br />{localValidationReason(t, draftValidation)}</>}</span></div>}<div className="word-form__actions"><button type="button" className="button button--soft" disabled={draftValidationPending || !draftWord.trim()} onClick={() => void validateDraftWord()}><SearchCheck size={16} /> {draftValidationPending ? t('vocab.checking') : t('vocab.checkWord')}</button><button type="button" className="button button--plain" disabled={pending || draftValidationPending} onClick={() => { setShowForm(false); setDraftWord(''); setDraftValidation(null); }}>{t('vocab.cancel')}</button><button type="submit" className="button button--dark" disabled={pending || draftValidationPending}><CheckCircle2 size={16} /> {pending ? t('vocab.saving') : t('vocab.save')}</button></div></form></section>}
 
     <div className="vocabulary-table" role="table" aria-label={t('vocab.table')}>
       <div className="vocabulary-table__head" role="row"><span>{t('vocab.word')}</span><span>{t('vocab.context')}</span><span>{t('vocab.status')}</span></div>
