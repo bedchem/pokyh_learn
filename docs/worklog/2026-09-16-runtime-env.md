@@ -15,9 +15,10 @@
   started with this `.env` returned health `200` and rendered the sign-in page
   without the privacy-configuration warning; the test container was removed.
 - Risk / next step: The API key was pasted into chat and should be rotated after
-  deployment. Set `NEXT_PUBLIC_SITE_URL` to the real HTTPS Learn hostname for
-  a public deployment; the current value targets local port 3005. The live
+  deployment. The local `.env` now uses the real HTTPS Learn hostname and
+  `0.0.0.0`; copy the same plain, non-Markdown values into Dokploy's service
+  environment. The live
   `learn.pokyh.com/api/health` still returns `503`, proving the deployed
   container has not received the same runtime environment or has not been
   recreated after the environment update.
-- Release state: local-only `.env`; committed `d53c7fc`, push in progress
+- Release state: local-only `.env`; committed `70c2d22`, push blocked by GitHub DNS resolution
