@@ -1,8 +1,33 @@
 # Compatibility entrypoint for deployment systems that only look for the
-# legacy Docker Compose filename. Keep the service definition in compose.yaml
-# so both `docker compose` defaults and Dokploy use the same configuration.
+# legacy Docker Compose filename. Keep this file self-contained so Dokploy does
+# not depend on Compose `extends` support or cross-file service resolution.
+name: pokyh-learn
+
 services:
   frontend:
-    extends:
-      file: compose.yaml
-      service: frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      # Preserve literal secret characters in the operator-owned runtime file;
+      # Compose's interpolation belongs only to non-sensitive container wiring.
+      - path: ${LEARN_ENV_FILE:-.env}
+        required: true
+        format: raw
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3005}
+      HOSTNAME: 0.0.0.0
+    ports:
+      # Publish on the selected interface; put TLS/reverse-proxy policy in
+      # front of the container for the public learn.pokyh.com deployment.
+      - ${LEARN_BIND_ADDRESS:-127.0.0.1}:${PORT:-3005}:${PORT:-3005}
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

@@ -98,9 +98,10 @@ cp .env.example .env
 docker compose --env-file .env up --build -d
 ```
 
-The repository also includes `docker-compose.yml` as a compatibility entry
-point for deployment platforms that invoke that filename explicitly; it
-extends the same service definition from `compose.yaml`.
+The repository also includes a self-contained `docker-compose.yml` as a
+compatibility entry point for deployment platforms that invoke that filename
+explicitly. Keep it aligned with `compose.yaml` when changing deployment
+settings.
 
 By default the service listens at `http://127.0.0.1:3005`. Keep that loopback
 binding and terminate TLS in a reverse proxy for `learn.pokyh.com`. If a
