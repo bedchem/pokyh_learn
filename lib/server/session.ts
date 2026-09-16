@@ -100,7 +100,23 @@ export function assertSameOrigin(request: NextRequest) {
 
   try {
     const url = new URL(origin);
-    if (url.host !== host) {
+    // A TLS reverse proxy can forward the request with its private upstream
+    // host while the browser still sends the public Learn origin. Accept that
+    // one explicitly configured public origin; direct requests still need to
+    // match the request host exactly. Never trust an arbitrary forwarded host.
+    // Use dynamic env access: Next.js statically inlines direct
+    // `process.env.NEXT_PUBLIC_*` reads during the build, while this value is
+    // deliberately supplied by Dokploy at container runtime.
+    const configuredSiteUrl = Reflect.get(process.env, 'NEXT_PUBLIC_SITE_URL');
+    let configuredOrigin = '';
+    if (typeof configuredSiteUrl === 'string' && configuredSiteUrl.trim()) {
+      try {
+        configuredOrigin = new URL(configuredSiteUrl.trim()).origin;
+      } catch {
+        configuredOrigin = '';
+      }
+    }
+    if (url.origin !== configuredOrigin && url.host !== host) {
       throw new ClientRequestProblem('Diese Anfrage wurde abgelehnt.', 403);
     }
   } catch (error) {
