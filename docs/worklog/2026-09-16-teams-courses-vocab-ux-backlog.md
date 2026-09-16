@@ -185,6 +185,44 @@ in `pokyh_learn-frontend`; `npx tsc --noEmit` and `npm run build` clean in
 session available here to browser-test `/profile` or the workspace-menu
 dropdown interactively — verified by strict typecheck/lint/build only.
 
+### Done (third batch, same day — self-contained spelling check)
+
+User follow-up: build a local algorithm that checks spelling itself, plus a
+fallback for when the external dictionary API doesn't work.
+
+- Root cause: German/Italian entries got **no check at all** — the external
+  `dictionaryapi.dev` only documents English headwords, so non-English words
+  were silently waved through as "editorial review" with zero verification.
+- Built a dependency-free local heuristic in `learnDictionary.ts`:
+  structural spelling plausibility (vowel presence, triple-letter-repeat,
+  language-tuned max consonant-run — German needed a generous threshold
+  after "Herbstpflicht" false-flagged at the initial value, real compounds
+  legitimately run 7+ consonants at morpheme boundaries) plus a same-course
+  near-duplicate check (Levenshtein distance 1) against this platform's own
+  already-saved vocabulary — never a third-party word list.
+- Deliberately did **not** bundle the standard npm Hunspell dictionaries for
+  German/Italian (`dictionary-de`, `dictionary-it`) after checking their
+  licenses — GPL-2/3, which needs the same license/provenance review this
+  repo's CLAUDE.md already requires before adding any bundled lexical
+  source, not a casual `npm install`.
+- This local check now runs for all three languages, and serves as the
+  fallback whenever the external English API is disabled, misconfigured, or
+  unreachable — verified against a **real induced failure** (the sandboxed
+  Docker test network genuinely couldn't reach the external API), not just
+  a simulated one.
+- Returns a machine-readable `reasonCode` (translated client-side into
+  de/en/it) instead of raw English backend prose, fixing a related gap
+  found while wiring it up: the frontend never displayed the validation
+  `message` field at all before this.
+
+Verification: standalone heuristic sanity tests (15/15 structural cases,
+Levenshtein distance cases) before touching the real service; full Docker
+end-to-end test against a live MySQL + running server — real near-duplicate
+detection via an actual DB query, real structural rejections, real
+API-unreachable fallback, real unauthorized/wrong-course rejection, real
+audit log inspection (confirmed no raw word content is logged). `npx tsc
+--noEmit`, `npm run lint`, `npm run build` clean in both repos.
+
 ### Remaining (not done)
 
 7. Visual/contrast audit beyond the Teams card fixed in the first batch —
