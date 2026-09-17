@@ -33,6 +33,17 @@ export async function getRefreshToken() {
   return (await cookies()).get(cookieNames().refresh)?.value ?? null;
 }
 
+// Deliberately no `maxAge`/`expires` on any of these: that makes every one of
+// them a browser *session* cookie rather than a persistent one. The backend's
+// own signed token expiry (and its account-wide refresh-token validity) is
+// unchanged and still authoritative — this only controls how long the
+// browser is willing to hold and resend the cookie client-side. A session
+// cookie is cleared by the browser when it fully closes (not merely a tab),
+// so staying signed in for weeks requires the browser to stay open, and
+// nothing is left signed in on disk once it does not. Some browsers'
+// "continue where you left off" / crash-recovery feature can still restore
+// session cookies, which is a known, browser-controlled limit of this
+// mechanism, not something a cookie attribute can fully close.
 export function writeSession(
   response: NextResponse,
   value: { accessToken: string; refreshToken: string },
@@ -42,17 +53,14 @@ export function writeSession(
   response.cookies.set(config.sessionCookieName, value.accessToken, {
     ...base,
     httpOnly: true,
-    maxAge: 60 * 60,
   });
   response.cookies.set(config.refreshCookieName, value.refreshToken, {
     ...base,
     httpOnly: true,
-    maxAge: 60 * 60 * 24 * 30,
   });
   response.cookies.set(config.csrfCookieName, randomBytes(32).toString('base64url'), {
     ...base,
     httpOnly: false,
-    maxAge: 60 * 60 * 24 * 30,
   });
 }
 
@@ -61,7 +69,6 @@ export function writeRefreshedAccessToken(response: NextResponse, accessToken: s
   response.cookies.set(config.sessionCookieName, accessToken, {
     ...cookieBase(),
     httpOnly: true,
-    maxAge: 60 * 60,
   });
 }
 
@@ -74,12 +81,10 @@ export function writeRefreshedTokens(response: NextResponse, value: { accessToke
   response.cookies.set(config.sessionCookieName, value.accessToken, {
     ...base,
     httpOnly: true,
-    maxAge: 60 * 60,
   });
   response.cookies.set(config.refreshCookieName, value.refreshToken, {
     ...base,
     httpOnly: true,
-    maxAge: 60 * 60 * 24 * 30,
   });
 }
 

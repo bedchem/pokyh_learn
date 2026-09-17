@@ -125,6 +125,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .page-heading--inline { align-items: center; }
 
 .page-lead { max-width: 680px; margin-top: 12px; color: var(--ink-muted); font-size: 16px; }
+.practice-language-filter { margin-top: 8px; color: var(--ink-muted); font-size: 13px; font-weight: 700; }
 
 .panel { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-soft); }
 

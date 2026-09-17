@@ -1,6 +1,7 @@
 'use client';
 
-import { CheckCircle2, CircleAlert, PencilLine, Plus, Search, SearchCheck, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { BrainCircuit, CheckCircle2, CircleAlert, PencilLine, Plus, Search, SearchCheck, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 import { learnApi } from '@/lib/client/api';
@@ -178,6 +179,7 @@ export function VocabularyWorkspace({
     <div className="vocabulary-toolbar">
       <label className="search-field"><Search size={18} /><span className="sr-only">{t('vocab.search')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('vocab.searchPlaceholder')} /></label>
       {courses.length > 1 && <label className="course-select"><span className="sr-only">{t('vocab.courseSelect')}</span><select value={selectedCourseId} onChange={(event) => setSelectedCourseId(event.target.value)}>{courses.map((course) => <option value={course.id} key={course.id}>{course.title}</option>)}</select></label>}
+      {selectedCourse && <Link href={`/practice?courseId=${selectedCourse.id}`} className="button button--soft"><BrainCircuit size={16} /> {t('vocab.trainThis')}</Link>}
       {canAuthorCourse && <button className="button button--dark" type="button" onClick={() => setShowForm(true)}><Plus size={16} /> {t('vocab.add')}</button>}
     </div>
 

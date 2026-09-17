@@ -219,8 +219,9 @@ async function getMyCourses(token: string): Promise<Course[]> {
   return payload.courses.map((course) => mapCourse(course, course.enrollments?.[0], course.permissions));
 }
 
-async function getQuestionQueue(token: string, scope: 'WRONG' | 'DUE' | 'NEW', courseTitles: Map<string, string>) {
-  const payload = await backendFetch<{ questions: BackendReview[] }>(pathFor(`/reviews?scope=${scope}&limit=20`), {
+async function getQuestionQueue(token: string, scope: 'WRONG' | 'DUE' | 'NEW', courseTitles: Map<string, string>, courseId?: string) {
+  const courseParam = courseId ? `&courseId=${encodeURIComponent(courseId)}` : '';
+  const payload = await backendFetch<{ questions: BackendReview[] }>(pathFor(`/reviews?scope=${scope}&limit=20${courseParam}`), {
     token,
     cache: 'no-store',
   });
@@ -318,16 +319,17 @@ export async function getVocabulary(token?: string | null, courseId?: string): P
 export async function getReviewQuestions(
   token?: string | null,
   forceScope?: 'WRONG' | 'DUE' | 'NEW',
+  courseId?: string,
 ): Promise<ReviewQuestion[]> {
-  if (isDemoMode()) return demoQuestions;
+  if (isDemoMode()) return courseId ? demoQuestions.filter((question) => question.courseId === courseId) : demoQuestions;
   if (!token) return [];
   const courses = await getMyCourses(token);
   const titles = new Map(courses.map((course) => [course.id, course.title]));
   if (forceScope) {
-    return getQuestionQueue(token, forceScope, titles).catch(() => []);
+    return getQuestionQueue(token, forceScope, titles, courseId).catch(() => []);
   }
   for (const scope of ['WRONG', 'DUE', 'NEW'] as const) {
-    const questions = await getQuestionQueue(token, scope, titles);
+    const questions = await getQuestionQueue(token, scope, titles, courseId);
     if (questions.length) return questions;
   }
   return [];
