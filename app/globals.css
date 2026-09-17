@@ -575,7 +575,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 
 /* Teams, library and forms */
-.team-grid, .library-grid, .admin-area-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px; }
+.team-grid, .library-grid, .admin-area-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 22px; }
 .team-card { display: flex; min-height: 255px; flex-direction: column; padding: 23px; border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); }
 .team-card--coral { background: var(--rose-wash); }
 .team-card--lavender { background: var(--violet-wash); }
@@ -592,9 +592,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .new-team-card > span { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 15px; background: #fff; box-shadow: var(--shadow-soft); }
 .new-team-card b { color: var(--ink); }
 .new-team-card p { max-width: 250px; margin: 0; font-size: 12px; }
-.library-card { padding: 27px; }
-.library-card h2 { margin: 16px 0 7px; font-size: 23px; letter-spacing: -.04em; }
-.library-card p { min-height: 60px; color: #716c76; font-size: 13px; }
+.library-card { padding: 32px; }
+.library-card h2 { margin: 18px 0 10px; font-size: 23px; letter-spacing: -.04em; }
+.library-card p { min-height: 60px; color: #716c76; font-size: 13px; line-height: 1.55; }
 .library-card .button, .library-card .text-link { margin-top: 17px; }
 .create-page { max-width: 1070px; }
 
