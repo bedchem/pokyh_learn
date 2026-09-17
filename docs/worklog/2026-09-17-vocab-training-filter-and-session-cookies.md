@@ -170,5 +170,8 @@ cookie attribute can fully close.
 
 ## Release state
 
-Uncommitted — awaiting the user's explicit commit/push scope and Git
-identity confirmation per this repo's release protocol.
+Committed `68e8e3a` and pushed `origin/main` (`fc55c1a..68e8e3a`), with the
+user's explicit confirmation of scope and Git identity
+(`Plattnericus <felix.plattner312009@outlook.de>`, local repo config only,
+no AI co-author trailer per the user's explicit instruction and the
+strengthened `CLAUDE.md` rule above).
