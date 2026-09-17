@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  BookMarked,
   BookOpen,
   ChevronDown,
   Compass,
@@ -48,7 +47,6 @@ const navigation: Array<{ href: string; labelKey: string; icon: typeof Home; adm
   { href: '/catalog', labelKey: 'nav.catalog', icon: Compass },
   { href: '/courses', labelKey: 'nav.courses', icon: BookOpen },
   { href: '/practice', labelKey: 'nav.practice', icon: Sparkles },
-  { href: '/vocabulary', labelKey: 'nav.vocabulary', icon: BookMarked },
   { href: '/teams', labelKey: 'nav.teams', icon: UsersRound },
   { href: '/library', labelKey: 'nav.library', icon: LibraryBig },
 ];
