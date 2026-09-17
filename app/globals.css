@@ -541,6 +541,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .word-form label, .course-form label { display: grid; gap: 6px; color: #67616c; font-size: 12px; font-weight: 750; }
 .word-form input, .course-form input, .course-form textarea, .course-form select { min-height: 42px; padding: 0 11px; border-radius: 10px; }
 .word-form__actions { display: flex; grid-column: 1 / -1; justify-content: flex-end; gap: 8px; margin-top: 5px; }
+.word-form form > .inline-notice { grid-column: 1 / -1; margin-top: 0; }
+.word-form__input-wrap { position: relative; display: flex; align-items: center; }
+.word-form__input-wrap input { flex: 1; padding-right: 34px; }
+.word-form__status-icon { position: absolute; right: 11px; color: var(--ink-muted); pointer-events: none; }
+.word-form__status-icon--ok { color: var(--mint); }
+.word-form__status-icon--warn { color: var(--sun); }
+.word-form__hint { display: flex; align-items: center; gap: 7px; margin-top: 2px; color: #837e89; font-weight: 500; }
+.word-form__hint .text-link { font-size: 11px; }
 .vocabulary-table { margin-top: 17px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: var(--shadow-soft); }
 .vocabulary-table__head, .vocabulary-row { display: grid; grid-template-columns: 1.05fr 1.2fr .8fr 32px; align-items: center; gap: 16px; padding: 14px 19px; }
 .vocabulary-table__head { border-bottom: 1px solid var(--line); color: #87818d; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
