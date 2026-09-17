@@ -200,7 +200,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .workspace-menu__chevron--open { transform: rotate(180deg); }
 
-.workspace-menu__panel { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; display: grid; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); z-index: 20; }
+.workspace-menu__panel { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; display: grid; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); z-index: 20; transform-origin: bottom left; animation: pop-in .15s ease-out; }
 
 .workspace-menu__item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; border: none; border-radius: 10px; background: transparent; color: var(--ink); font-size: 13px; font-weight: 650; text-align: left; cursor: pointer; }
 
@@ -235,9 +235,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; width: min(1280px, 100%); height: 88px; margin: 0 auto; padding: 0 38px; }
 
-.search-trigger { display: flex; align-items: center; gap: 9px; min-width: 275px; padding: 9px 12px; border: 1px solid transparent; border-radius: 12px; color: #827d88; background: transparent; text-align: left; }
+.search-trigger { display: flex; align-items: center; gap: 9px; min-width: 275px; padding: 9px 12px; border: 1px solid transparent; border-radius: 12px; color: #827d88; background: transparent; text-align: left; transition: border-color .15s ease, background-color .15s ease; }
 
-.search-trigger:hover { border-color: var(--line); background: var(--surface-raised); }
+.search-trigger:hover, .search-trigger:focus-visible { border-color: var(--line); background: var(--surface-raised); }
 
 .search-trigger kbd { margin-left: auto; padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink-muted); background: var(--surface-raised); font-size: 11px; }
 
@@ -532,7 +532,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 /* Vocabulary */
 .vocabulary-toolbar { display: flex; gap: 10px; }
 .vocabulary-toolbar .search-field { border: 1px solid var(--line); background: #fff; box-shadow: var(--shadow-soft); }
-.inline-notice { display: flex; align-items: center; gap: 7px; margin-top: 13px; padding: 11px 13px; border: 1px solid #d8d6fd; border-radius: 13px; color: #5a57a9; background: #f3f2ff; font-size: 12px; }
+.inline-notice { display: flex; align-items: center; gap: 7px; margin-top: 13px; padding: 11px 13px; border: 1px solid #d8d6fd; border-radius: 13px; color: #5a57a9; background: #f3f2ff; font-size: 12px; animation: pop-in .18s ease-out; }
 .inline-notice button { margin-left: auto; border: 0; color: inherit; background: none; font-size: 18px; }
 .word-form { display: grid; grid-template-columns: .75fr 1.25fr; gap: 28px; margin-top: 17px; padding: 25px; }
 .word-form h2 { margin: 5px 0 8px; font-size: 25px; letter-spacing: -.045em; }
@@ -602,8 +602,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .team-member-manager__status { display: flex; align-items: center; gap: 7px; color: var(--ink-muted); font-size: 13px; }
 .team-member-manager__status .spin, .team-member-manager__search .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.team-member-manager__list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; padding: 0; list-style: none; }
-.team-member-manager__list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-raised); }
+@keyframes pop-in { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.team-member-manager__list { display: flex; flex-direction: column; gap: 11px; margin: 18px 0; padding: 0; list-style: none; }
+.team-member-manager__list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); }
 .team-member-manager__name { font-size: 13px; font-weight: 700; color: var(--ink); }
 .team-member-manager__name--link:hover, .team-member-manager__name--link:focus-visible { color: var(--violet); text-decoration: underline; text-underline-offset: 2px; }
 .team-member-manager__role { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; color: var(--ink-muted); background: var(--surface-muted); }
@@ -612,8 +613,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .team-member-manager__add { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .team-member-manager__search { position: relative; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 11px; background: var(--surface-raised); color: var(--ink-muted); }
 .team-member-manager__search input { flex: 1; border: none; background: transparent; font-size: 13px; color: var(--ink); outline: none; }
-.team-member-manager__candidates { margin: 6px 0 0; padding: 4px; list-style: none; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-raised); box-shadow: var(--shadow-soft); max-height: 180px; overflow-y: auto; }
-.team-member-manager__candidates button { display: block; width: 100%; padding: 7px 10px; border: none; background: transparent; text-align: left; font-size: 13px; color: var(--ink); border-radius: 8px; cursor: pointer; }
+.team-member-manager__candidates { margin: 6px 0 0; padding: 4px; list-style: none; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-raised); box-shadow: var(--shadow-soft); max-height: 180px; overflow-y: auto; transform-origin: top; animation: pop-in .15s ease-out; }
+.team-member-manager__candidates button { display: block; width: 100%; padding: 8px 11px; border: none; background: transparent; text-align: left; font-size: 13px; color: var(--ink); border-radius: 8px; cursor: pointer; transition: background-color .12s ease; }
 .team-member-manager__candidates button:hover, .team-member-manager__candidates button:focus-visible { background: var(--surface-muted); }
 .team-member-manager__empty { margin: 6px 0 0; font-size: 12px; color: var(--ink-muted); }
 .team-member-manager__confirm { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
