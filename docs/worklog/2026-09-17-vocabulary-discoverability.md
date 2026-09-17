@@ -112,5 +112,6 @@ verification gap above.
 
 ## Release state
 
-Uncommitted — awaiting the user's explicit commit/push scope and Git
-identity confirmation per this repo's release protocol.
+Committed `e7ad11a` and pushed `origin/main` (`a7e53d3..e7ad11a`), with the
+user's explicit confirmation of scope and Git identity
+(`Plattnericus <felix.plattner312009@outlook.de>`, local repo config only).
