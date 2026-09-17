@@ -6,6 +6,7 @@ import {
   Compass,
   GraduationCap,
   Home,
+  Languages,
   LibraryBig,
   LogOut,
   Menu,
@@ -21,6 +22,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { BrandMark } from '@/components/ui/brand-mark';
 import { Avatar } from '@/components/ui/avatar';
 import { PreferenceControls } from '@/components/layout/preference-controls';
+import { QuickAddVocabularyButton } from '@/components/learn/vocabulary-quick-add';
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
 import { learnApi, logout } from '@/lib/client/api';
 
@@ -46,6 +48,10 @@ const navigation: Array<{ href: string; labelKey: string; icon: typeof Home; adm
   { href: '/dashboard', labelKey: 'nav.dashboard', icon: Home },
   { href: '/catalog', labelKey: 'nav.catalog', icon: Compass },
   { href: '/courses', labelKey: 'nav.courses', icon: BookOpen },
+  // Placed ahead of Practice/Teams/Library so it survives the mobile bottom
+  // nav's first-5 cutoff below — vocabulary needed its own, always-visible
+  // place, not just a link buried inside a specific course.
+  { href: '/vocabulary', labelKey: 'nav.vocabulary', icon: Languages },
   { href: '/practice', labelKey: 'nav.practice', icon: Sparkles },
   { href: '/teams', labelKey: 'nav.teams', icon: UsersRound },
   { href: '/library', labelKey: 'nav.library', icon: LibraryBig },
@@ -217,6 +223,7 @@ export function AppShell({
           <NavItems onNavigate={() => setMenuOpen(false)} identity={identity} />
           {identity && (
             <div className="mobile-menu__footer">
+              <QuickAddVocabularyButton variant="menu" onNavigate={() => setMenuOpen(false)} />
               <Link href="/settings" className="workspace-menu__item" onClick={() => setMenuOpen(false)}>
                 <Settings size={16} /> {t('action.settings')}
               </Link>
@@ -234,7 +241,8 @@ export function AppShell({
             <Link href="/catalog" className="search-trigger" aria-label={t('action.search')}><Search size={18} /><span>{t('action.search')}</span><kbd>{shortcutKeyLabel}</kbd></Link>
             <div className="topbar__actions">
               <PreferenceControls compact />
-              <Link href="/create/course" className="button button--dark button--small"><GraduationCap size={16} /> {t('action.createCourse')}</Link>
+              <QuickAddVocabularyButton variant="topbar" />
+              <Link href="/create/course" className="button button--plain button--small"><GraduationCap size={16} /> {t('action.createCourse')}</Link>
               <Link href="/settings" className="avatar-button" aria-label={t('action.settings')}><Avatar name={identity.username} size={30} /></Link>
             </div>
           </>}

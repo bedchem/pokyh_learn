@@ -1,87 +1,12 @@
 'use client';
 
-import { CheckCircle2, CircleAlert, Loader2, PencilLine, Plus, Search, SearchCheck, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, CircleAlert, PencilLine, Plus, Search, SearchCheck, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { learnApi } from '@/lib/client/api';
 import type { Course, VocabularyItem } from '@/lib/types';
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
-
-type VocabularyResponse = {
-  id: string;
-  courseId: string;
-  sourceLanguage: string;
-  targetLanguage: string;
-  sourceText: string;
-  article?: string;
-  partOfSpeech?: string;
-  notes?: string;
-  verificationStatus?: string;
-  contextSentence?: string;
-  readyForQuiz?: boolean;
-  canEdit?: boolean;
-};
-
-type WordValidationReasonCode = 'no_vowel' | 'triple_repeat' | 'consonant_run' | 'near_duplicate' | 'no_issue_found';
-
-type WordSuggestion = { translation: string; provider: string };
-
-type WordValidation = {
-  provider: 'dictionaryapi' | 'local';
-  language: string;
-  status: 'verified' | 'not_found' | 'manual' | 'unavailable';
-  definition: string | null;
-  example: string | null;
-  partOfSpeech: string | null;
-  cached: boolean;
-  stale: boolean;
-  message: string | null;
-  // Machine-readable outcome of the local, dependency-free spelling check
-  // (see learnDictionary.ts on the backend) — translated client-side rather
-  // than shown as the backend's raw English message. Null for a result that
-  // came from the external dictionary API instead.
-  reasonCode: WordValidationReasonCode | null;
-  similarWord: string | null;
-};
-
-function localValidationReason(t: (key: string, vars?: Record<string, string>) => string, validation: WordValidation): string | null {
-  switch (validation.reasonCode) {
-    case 'no_vowel': return t('vocab.reasonNoVowel');
-    case 'triple_repeat': return t('vocab.reasonTripleRepeat');
-    case 'consonant_run': return t('vocab.reasonConsonantRun');
-    case 'near_duplicate': return t('vocab.reasonNearDuplicate', { word: validation.similarWord ?? '' });
-    case 'no_issue_found': return t('vocab.reasonNoIssueFound');
-    default: return null;
-  }
-}
-
-// A "looks fine" result (local check found nothing, or a plain dictionary
-// hit with no extra content) collapses to a small status icon instead of a
-// full notice block — only something actually worth reading (a flagged
-// word, a definition/example, or a check that couldn't run) expands it.
-function hasNoteworthyDetail(validation: WordValidation): boolean {
-  return isBlockingFlag(validation)
-    || validation.status === 'not_found'
-    || validation.status === 'unavailable'
-    || Boolean(validation.definition || validation.example);
-}
-
-// A flagged local check (typo-shaped spelling, or too close to an existing
-// word) blocks saving on the first attempt — not a hard wall, since the
-// heuristic can false-positive on a genuinely rare word, but a deliberate
-// second click (draftFlagAcknowledged) rather than something silently
-// skippable.
-function isBlockingFlag(validation: WordValidation): boolean {
-  return validation.provider === 'local' && validation.status === 'not_found';
-}
-
-function languageCode(language: string) {
-  const normalized = language.toLocaleLowerCase('de-DE');
-  if (normalized.includes('ital')) return 'it';
-  if (normalized.includes('engl')) return 'en';
-  if (normalized.includes('deutsch')) return 'de';
-  return normalized.slice(0, 20) || 'und';
-}
+import { VocabularyQuickAddForm, type VocabularyResponse } from '@/components/learn/vocabulary-quick-add';
 
 function fromResponse(entry: VocabularyResponse): VocabularyItem {
   const validation = entry.verificationStatus === 'VERIFIED'
@@ -121,16 +46,8 @@ export function VocabularyWorkspace({
   const [items, setItems] = useState(initialItems);
   const [query, setQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [draftWord, setDraftWord] = useState('');
-  const [draftAnswer, setDraftAnswer] = useState('');
-  const [draftValidation, setDraftValidation] = useState<WordValidation | null>(null);
-  const [draftValidationPending, setDraftValidationPending] = useState(false);
-  const [draftSuggestion, setDraftSuggestion] = useState<WordSuggestion | null>(null);
-  const [draftSuggestionPending, setDraftSuggestionPending] = useState(false);
-  const [draftFlagAcknowledged, setDraftFlagAcknowledged] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState(defaultCourseId || courses[0]?.id || '');
   const [notice, setNotice] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
   const [answerEntryId, setAnswerEntryId] = useState<string | null>(null);
   const [answerText, setAnswerText] = useState('');
   const [suggestion, setSuggestion] = useState<string | null>(null);
@@ -144,155 +61,8 @@ export function VocabularyWorkspace({
     return haystack.includes(query.toLocaleLowerCase('de'));
   }), [items, query, selectedCourseId]);
 
-  function noticeKeyForValidation(validation: WordValidation): string {
-    return validation.provider === 'local'
-      ? (validation.status === 'not_found' ? 'vocab.wordLocalTypo' : 'vocab.wordLocalOk')
-      : validation.status === 'verified'
-        ? 'vocab.wordValidated'
-        : validation.status === 'not_found'
-          ? 'vocab.wordNotFound'
-          : validation.status === 'unavailable'
-            ? 'vocab.wordCheckOffline'
-            : 'vocab.wordManualReview';
-  }
-
-  async function runValidation(sourceText: string): Promise<WordValidation | null> {
-    if (!selectedCourse) return null;
-    try {
-      const payload = await learnApi<{ validation: WordValidation }>('vocabulary/validate', {
-        method: 'POST',
-        body: JSON.stringify({
-          courseId: selectedCourse.id,
-          sourceLanguage: languageCode(selectedCourse.language),
-          sourceText,
-        }),
-      });
-      return payload.validation;
-    } catch {
-      // A check that couldn't run must never block saving — same
-      // fail-open policy as the backend's own "unavailable" outcome.
-      return null;
-    }
-  }
-
-  // Spelling check and translation suggestion both run automatically a
-  // moment after the learner stops typing the source word, instead of
-  // requiring a manual "check" click before every save. Only setTimeout is
-  // called synchronously here; every setState happens inside a .then() off
-  // a promise created inside that timeout callback, and `cancelled` guards
-  // against a stale result landing after the word changed again or the
-  // form closed — same debounce shape as the candidate search in
-  // team-member-manager.tsx.
-  useEffect(() => {
-    if (!showForm) return;
-    const course = courses.find((candidate) => candidate.id === selectedCourseId);
-    if (!course) return;
-    const sourceText = draftWord.trim();
-    if (!sourceText) return;
-    const courseId = course.id;
-    const sourceLanguage = languageCode(course.language);
-    const targetLanguage = languageCode(course.sourceLanguage);
-    let cancelled = false;
-    const handle = setTimeout(() => {
-      setDraftValidationPending(true);
-      learnApi<{ validation: WordValidation }>('vocabulary/validate', {
-        method: 'POST',
-        body: JSON.stringify({ courseId, sourceLanguage, sourceText }),
-      })
-        .then((payload) => { if (!cancelled) setDraftValidation(payload.validation); })
-        .catch(() => { /* fail open — an unreachable check must never block typing */ })
-        .finally(() => { if (!cancelled) setDraftValidationPending(false); });
-
-      setDraftSuggestionPending(true);
-      learnApi<{ suggestion: { translation: string; provider: string; cached: boolean } }>('vocabulary/lookup', {
-        method: 'POST',
-        body: JSON.stringify({ courseId, sourceLanguage, targetLanguage, sourceText }),
-      })
-        .then((payload) => {
-          if (cancelled) return;
-          setDraftSuggestion({ translation: payload.suggestion.translation, provider: payload.suggestion.provider });
-          // Never overwrite text the learner already typed themselves —
-          // just offer it as a "use suggestion" hint instead (see JSX).
-          setDraftAnswer((current) => current || payload.suggestion.translation);
-        })
-        .catch(() => { /* same fail-open policy */ })
-        .finally(() => { if (!cancelled) setDraftSuggestionPending(false); });
-    }, 700);
-    return () => { cancelled = true; clearTimeout(handle); };
-  }, [draftWord, showForm, selectedCourseId, courses]);
-
-  async function addWord(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedCourse) return;
-    const sourceText = draftWord.trim();
-    if (!sourceText) return;
-    const targetText = draftAnswer.trim();
-
-    setPending(true);
-    setNotice(null);
-    try {
-      if (!draftFlagAcknowledged) {
-        // Reuse an already-completed debounced check for this exact text
-        // when there is one; only fire a fresh one for fast typers/instant
-        // submitters who outran the debounce.
-        const validation = draftValidation ?? await runValidation(sourceText);
-        if (validation) {
-          setDraftValidation(validation);
-          if (isBlockingFlag(validation)) {
-            setDraftFlagAcknowledged(true);
-            setNotice(t(noticeKeyForValidation(validation)));
-            return;
-          }
-        }
-      }
-
-      const created = await learnApi<VocabularyResponse>('vocabulary', {
-        method: 'POST',
-        body: JSON.stringify({
-          courseId: selectedCourse.id,
-          sourceLanguage: languageCode(selectedCourse.language),
-          // The learner's own base language (e.g. English learning Italian ->
-          // targetLanguage 'en'), never a hardcoded language — this is what
-          // makes an arbitrary pair like English<->Italian work, not just German.
-          targetLanguage: languageCode(selectedCourse.sourceLanguage),
-          sourceText,
-          targetText,
-        }),
-      });
-      setItems((current) => [{ ...fromResponse(created), canEdit: true }, ...current]);
-      setShowForm(false);
-      setDraftWord('');
-      setDraftAnswer('');
-      setDraftValidation(null);
-      setDraftSuggestion(null);
-      setDraftFlagAcknowledged(false);
-
-      if (!targetText) {
-        setNotice(t('vocab.saved'));
-      } else {
-        // Verify immediately, in the same save action, rather than leaving
-        // it as a separate step the author has to remember later — still
-        // advisory only (see verifyAnswer below), never a silent grading
-        // change. The word and answer are already saved either way.
-        try {
-          const payload = await learnApi<{
-            entry: VocabularyResponse;
-            verification: { matches: boolean; suggestion: { translation: string; provider: string } };
-          }>(`vocabulary/${created.id}/verify`, { method: 'POST' });
-          replaceItem(payload.entry);
-          const verifyNotice = payload.verification.matches
-            ? t('vocab.answerMatches', { provider: payload.verification.suggestion.provider })
-            : t('vocab.answerDiffers', { suggestion: payload.verification.suggestion.translation });
-          setNotice(`${t('vocab.savedWithAnswer')} ${verifyNotice}`);
-        } catch {
-          setNotice(t('vocab.savedWithAnswer'));
-        }
-      }
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : t('vocab.saveError'));
-    } finally {
-      setPending(false);
-    }
+  function handleWordSaved(entry: VocabularyResponse) {
+    setItems((current) => [{ ...fromResponse(entry), canEdit: true }, ...current]);
   }
 
   function startAnswerEditor(item: VocabularyItem) {
@@ -413,43 +183,12 @@ export function VocabularyWorkspace({
 
     {notice && <div className="inline-notice" role="status"><Sparkles size={16} /> {notice}<button type="button" onClick={() => setNotice(null)} aria-label={t('vocab.dismiss')}>×</button></div>}
 
-    {showForm && <section className="word-form panel">
-      <div><p className="section-kicker">{t('vocab.newEntry')}</p><h2>{t('vocab.oneWord')}</h2><p>{t('vocab.oneWordBody')}</p></div>
-      <form onSubmit={addWord}>
-        <label>
-          {t('vocab.word')}
-          <span className="word-form__input-wrap">
-            <input
-              name="sourceText"
-              value={draftWord}
-              onChange={(event) => { setDraftWord(event.target.value); setDraftValidation(null); setDraftSuggestion(null); setDraftFlagAcknowledged(false); }}
-              lang={languageCode(selectedCourse?.language || '')}
-              placeholder={selectedCourse?.language.includes('Italien') ? 'es. stazione' : selectedCourse?.language.includes('Engl') ? 'e.g. delay' : t('vocab.wordPlaceholder')}
-              required
-              autoFocus
-            />
-            {draftValidationPending
-              ? <><Loader2 size={15} className="word-form__status-icon spin" aria-hidden /><span className="sr-only">{t('vocab.checking')}</span></>
-              : draftValidation && (isBlockingFlag(draftValidation)
-                ? <><CircleAlert size={15} className="word-form__status-icon word-form__status-icon--warn" aria-hidden /><span className="sr-only">{t(noticeKeyForValidation(draftValidation))}</span></>
-                : <><CheckCircle2 size={15} className="word-form__status-icon word-form__status-icon--ok" aria-hidden /><span className="sr-only">{t(noticeKeyForValidation(draftValidation))}</span></>)}
-          </span>
-        </label>
-        <label>
-          {t('vocab.targetAnswer')}
-          <span className="word-form__input-wrap">
-            <input value={draftAnswer} onChange={(event) => setDraftAnswer(event.target.value)} placeholder={t('vocab.targetPlaceholder')} />
-            {draftSuggestionPending && <><Loader2 size={15} className="word-form__status-icon spin" aria-hidden /><span className="sr-only">{t('vocab.checking')}</span></>}
-          </span>
-          {draftSuggestion && draftSuggestion.translation !== draftAnswer.trim() && <small className="word-form__hint">{t('vocab.suggestionPrefix')} „{draftSuggestion.translation}“<button type="button" className="text-link" onClick={() => setDraftAnswer(draftSuggestion.translation)}>{t('vocab.useSuggestion')}</button></small>}
-        </label>
-        {draftValidation && hasNoteworthyDetail(draftValidation) && <div className="inline-notice" role="status"><Sparkles size={16} /><span><b>{t(noticeKeyForValidation(draftValidation))}</b>{draftValidation.partOfSpeech && <> · {draftValidation.partOfSpeech}</>}{draftValidation.definition && <><br />{draftValidation.definition}</>}{draftValidation.example && <><br /><em>“{draftValidation.example}”</em></>}{localValidationReason(t, draftValidation) && <><br />{localValidationReason(t, draftValidation)}</>}</span></div>}
-        <div className="word-form__actions">
-          <button type="button" className="button button--plain" disabled={pending} onClick={() => { setShowForm(false); setDraftWord(''); setDraftAnswer(''); setDraftValidation(null); setDraftSuggestion(null); setDraftFlagAcknowledged(false); }}>{t('vocab.cancel')}</button>
-          <button type="submit" className={draftFlagAcknowledged ? 'button button--soft' : 'button button--dark'} disabled={pending}><CheckCircle2 size={16} /> {pending ? t('vocab.saving') : draftFlagAcknowledged ? t('vocab.saveAnyway') : t('vocab.save')}</button>
-        </div>
-      </form>
-    </section>}
+    {showForm && selectedCourse && <VocabularyQuickAddForm
+      courses={[selectedCourse]}
+      defaultCourseId={selectedCourse.id}
+      onSaved={handleWordSaved}
+      onCancel={() => setShowForm(false)}
+    />}
 
     <div className="vocabulary-table" role="table" aria-label={t('vocab.table')}>
       <div className="vocabulary-table__head" role="row"><span>{t('vocab.word')}</span><span>{t('vocab.context')}</span><span>{t('vocab.status')}</span></div>
