@@ -361,6 +361,22 @@ export async function getTeams(token?: string | null): Promise<Team[]> {
   }));
 }
 
+export interface TeammateAnalytics {
+  username: string;
+  totals: { streakDays: number; minutesLearned: number; activeDays: number };
+  yearActivity: Array<{ dayKey: string; answers: number; minutes: number }>;
+}
+
+// A teammate's aggregate stats only — never their course list or per-course
+// breakdown. The backend route itself enforces that both viewer and target
+// share this specific team; this is just the BFF pass-through.
+export async function getTeammateAnalytics(teamId: string, stableUid: string, token?: string | null): Promise<TeammateAnalytics | null> {
+  if (isDemoMode()) return null;
+  if (!token) return null;
+  return backendFetch<TeammateAnalytics>(pathFor(`/teams/${teamId}/members/${stableUid}/analytics`), { token, cache: 'no-store' })
+    .catch(() => null);
+}
+
 export async function getCourseOptions(token?: string | null): Promise<Course[]> {
   if (isDemoMode()) return demoCourses.filter((course) => course.isEnrolled || course.canEdit);
   if (!token) return [];

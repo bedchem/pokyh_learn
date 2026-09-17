@@ -12,6 +12,9 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const { token, identity } = await requireLearnUser(`/courses/${slug}`);
   const course = await getCourse(slug, token);
   if (!course) notFound();
-  if (!course.isEnrolled && !course.canEdit) redirect(`/catalog/${encodeURIComponent(slug)}`);
+  // Not every course a user can reach a link to is catalog-eligible (e.g. a
+  // TEAM-visibility course) — redirecting to /catalog/:slug for one of those
+  // would 404 instead of showing something useful. /courses always exists.
+  if (!course.isEnrolled && !course.canEdit) redirect('/courses');
   return <AppShell initialIdentity={identity}><CourseDetail course={course} enrolled={Boolean(course.isEnrolled)} authenticated /></AppShell>;
 }

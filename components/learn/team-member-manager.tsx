@@ -1,6 +1,7 @@
 'use client';
 
 import { Loader2, Search, ShieldCheck, UserPlus, UsersRound } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { learnApi } from '@/lib/client/api';
@@ -32,6 +33,7 @@ export function TeamMemberManager({ teamId, canManageMembers }: { teamId: string
   const [error, setError] = useState('');
 
   const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<Candidate | null>(null);
@@ -64,7 +66,11 @@ export function TeamMemberManager({ teamId, canManageMembers }: { teamId: string
   }, [teamId]);
 
   useEffect(() => {
-    if (!canManageMembers || !query.trim()) return;
+    // Browsable, not just searchable: an empty query still fetches (the
+    // backend's candidate-members route already returns a page of eligible
+    // users with no `q`), gated on the field being focused so it doesn't
+    // fetch on mount before the owner has shown any intent to add someone.
+    if (!canManageMembers || !searchFocused) return;
     let cancelled = false;
     const handle = setTimeout(() => {
       setSearching(true);
@@ -74,7 +80,7 @@ export function TeamMemberManager({ teamId, canManageMembers }: { teamId: string
         .finally(() => { if (!cancelled) setSearching(false); });
     }, 250);
     return () => { cancelled = true; clearTimeout(handle); };
-  }, [query, teamId, canManageMembers]);
+  }, [query, teamId, canManageMembers, searchFocused]);
 
   async function addMember() {
     if (!selected) return;
@@ -115,7 +121,9 @@ export function TeamMemberManager({ teamId, canManageMembers }: { teamId: string
         <ul className="team-member-manager__list">
           {(members ?? []).map((member) => (
             <li key={member.stableUid}>
-              <span className="team-member-manager__name">{member.username ?? 'Unbekannt'}</span>
+              <Link className="team-member-manager__name team-member-manager__name--link" href={`/teams/${teamId}/members/${member.stableUid}`}>
+                {member.username ?? 'Unbekannt'}
+              </Link>
               <span className={`team-member-manager__role team-member-manager__role--${member.role.toLowerCase()}`}>{roleLabel(member.role)}</span>
             </li>
           ))}
@@ -132,24 +140,26 @@ export function TeamMemberManager({ teamId, canManageMembers }: { teamId: string
               type="text"
               value={query}
               onChange={(event) => { setQuery(event.target.value); setSelected(null); }}
-              placeholder="POKYH-Benutzername suchen…"
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              placeholder="POKYH-Benutzername suchen oder auswählen…"
               autoComplete="off"
             />
             {searching && <Loader2 size={14} className="spin" />}
           </div>
 
-          {query.trim() && !selected && candidates.length > 0 && (
+          {searchFocused && !selected && candidates.length > 0 && (
             <ul className="team-member-manager__candidates" role="listbox">
               {candidates.map((candidate) => (
                 <li key={candidate.stableUid}>
-                  <button type="button" onClick={() => { setSelected(candidate); setQuery(candidate.username); setCandidates([]); }}>
+                  <button type="button" onMouseDown={(event) => { event.preventDefault(); setSelected(candidate); setQuery(candidate.username); setCandidates([]); }}>
                     {candidate.username}
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          {query.trim() && !selected && !searching && candidates.length === 0 && (
+          {searchFocused && !selected && !searching && candidates.length === 0 && (
             <p className="team-member-manager__empty">Keine passenden Nutzer gefunden.</p>
           )}
 

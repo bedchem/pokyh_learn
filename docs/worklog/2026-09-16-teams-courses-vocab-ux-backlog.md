@@ -223,11 +223,101 @@ API-unreachable fallback, real unauthorized/wrong-course rejection, real
 audit log inspection (confirmed no raw word content is logged). `npx tsc
 --noEmit`, `npm run lint`, `npm run build` clean in both repos.
 
+### Fourth batch (2026-09-17) — team vocab access, deletion, multi-owner, user picker, profile-of-others
+
+Full plan approved via `/plan` (see plan file
+`snoopy-tickling-kurzweil.md` in the Claude Code plan store) after two
+Explore agents + one Plan-agent design review. Root cause of the starter
+vocab courses being invisible/unusable: three independent gaps —
+`/catalog` correctly stays PUBLIC+PUBLISHED-only (not touched), "Meine
+Kurse" requires an explicit `LearnEnrollment` row that team membership
+never created, and `resolveCourseAccess` only ever grants team members
+`VIEW` (never `EDIT`), which blocked both adding vocabulary and submitting
+quiz attempts. Fix: a new `learnTeamVocab.ts` service grants both an
+`ACTIVE` enrollment and an `EDIT` course-access row to every current/new
+team member on the two starter courses specifically (not a blanket
+TEAM-visibility policy change), wired at team creation, the existing
+idempotent backfill button, and both member-add routes.
+
+Also approved in the same plan: wire up the already-working
+`DELETE /vocabulary/:entryId` backend route to a real delete button in
+`vocabulary-workspace.tsx` (backend needed zero changes); change
+"Eigentümer machen" from a transfer (which demoted the existing owner) to
+genuinely adding an additional simultaneous owner, since the codebase's
+own `ownerCount <= 1` removal guard already anticipated multi-owner as a
+valid state before today; and replace the blind username text input for
+adding team members (both the admin panel and learn.pokyh.com) with a
+searchable, browsable picker — the admin panel reuses the already-existing
+`adminApi.users()` endpoint, and learn.pokyh.com's candidate-search route
+already supported an empty query server-side, so only the frontend's
+early-return guard needed removing.
+
+### Status: implemented and verified end-to-end (2026-09-17)
+
+All of the plan above is now built, typechecked/linted/built clean in both
+repos, and verified against a real Docker stack (live MySQL, running
+server, no mocks) — not just simulated:
+
+- Team creation seeds 2 starter courses and grants the initial owner
+  EDIT + enrollment; `GET /learn/courses` lists both immediately.
+- Both member-add paths (admin panel, and the owner-triggered
+  learn.pokyh.com route built earlier — different transaction shapes,
+  confirmed both correctly call the post-commit grant) give a new member
+  the same access.
+- A team member can add a German↔Italian word and a German↔English word
+  (previously `ForbiddenError` on both) and submit a graded quiz attempt
+  with real `durationMs` tracking (previously blocked entirely).
+- Deletion: the entry's own creator gets 204; someone with no course
+  access at all gets 403.
+- The exact real-world "BFS FI 4" scenario was reproduced directly: a team
+  simulated as pre-fix (courses exist, zero access grants) correctly fails
+  `POST /vocabulary` beforehand, then the idempotent backfill button
+  (`created: 0` — no duplicate courses) retroactively grants access and
+  "Meine Kurse" starts showing both courses immediately after.
+- Multi-owner: promoting a second owner does not demote the first: both
+  show as OWNER afterward. Removing one of two owners succeeds; removing
+  the last remaining owner is still correctly blocked by the pre-existing
+  guard.
+- Teammate stats: a teammate can view another member's streak/minutes/
+  heatmap; the response never includes `courses` or `days` (only the
+  aggregate fields) — verified via direct field-presence check on the raw
+  response, not just eyeballing the shape; an outsider not on the team is
+  rejected (403) from both the stats route and the roster route.
+- The admin panel's reused `adminApi.users()` endpoint browses (empty
+  query) and searches correctly.
+- No unexpected errors in server logs across the whole run.
+
+Added after plan approval, same message:
+
+- Extend `/profile` so a team member can view **another** team member's
+  stats (streak, minutes, contribution heatmap) — same component, scoped
+  to a viewed user instead of only the caller. Needs a new backend route
+  that returns another user's analytics, authorized to team members
+  viewing a teammate only (never an arbitrary stranger — privacy: this is
+  the same team-scoping principle already enforced everywhere else in
+  this app, e.g. `resolveCourseAccess`'s TEAM-visibility check).
+- Git identity for commits going forward: `Plattnericus
+  <felix.plattner312009@outlook.de>` (previously `nexor
+  <nexor@plattnericus.dev>` earlier today — user explicitly changed it).
+- User asked to delete `pokyh-backend/.github/workflows/*` "if not
+  needed." Checked: `.github/workflows/ci.yml` validates the Prisma
+  schema, builds TypeScript, and runs `npm audit --omit=dev` on every
+  push/PR — this is exactly the quality gate manually run before every
+  commit throughout this whole session. Flagged to the user as clearly
+  needed rather than deleted; awaiting their explicit confirmation before
+  removing a repo's only CI safety net.
+
 ### Remaining (not done)
 
-7. Visual/contrast audit beyond the Teams card fixed in the first batch —
-   no further specific reports came in; would need either more screenshots
-   or a live authenticated walkthrough to find anything else.
-5. (action item, not code) An admin needs to enable `dictionaryEnabled` and
-   `dictionaryValidationEnabled` on the Learn config admin page for the
-   translation/spelling-check feature to actually respond to users.
+- Visual/contrast audit beyond the Teams card fixed earlier — no further
+  specific reports came in; would need either more screenshots or a live
+  authenticated walkthrough to find anything else.
+- (action item, not code) An admin needs to enable `dictionaryEnabled` and
+  `dictionaryValidationEnabled` on the Learn config admin page for the
+  translation/spelling-check feature to actually respond to users.
+- (action item, not code) `pokyh-backend/.github/workflows/ci.yml` — user
+  asked to delete it "if not needed." Checked: it validates the Prisma
+  schema, builds TypeScript, and runs `npm audit --omit=dev` on every
+  push/PR — exactly the quality gate manually run before every commit
+  this whole session. Not deleted; flagged back to the user instead of
+  removing a repo's only CI safety net on a conditional instruction.

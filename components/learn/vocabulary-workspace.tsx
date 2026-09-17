@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, CircleAlert, PencilLine, Plus, Search, SearchCheck, ShieldCheck, Sparkles } from 'lucide-react';
+import { CheckCircle2, CircleAlert, PencilLine, Plus, Search, SearchCheck, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 
 import { learnApi } from '@/lib/client/api';
@@ -109,6 +109,7 @@ export function VocabularyWorkspace({
   const [answerText, setAnswerText] = useState('');
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [answerPending, setAnswerPending] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const selectedCourse = courses.find((course) => course.id === selectedCourseId);
   const canAuthorCourse = editable && Boolean(selectedCourse?.canEdit);
   const filtered = useMemo(() => items.filter((item) => {
@@ -268,6 +269,21 @@ export function VocabularyWorkspace({
     }
   }
 
+  async function deleteWord(item: VocabularyItem) {
+    if (!window.confirm(t('vocab.deleteConfirm', { word: item.source }))) return;
+    setDeletingId(item.id);
+    setNotice(null);
+    try {
+      await learnApi(`vocabulary/${item.id}`, { method: 'DELETE' });
+      setItems((current) => current.filter((entry) => entry.id !== item.id));
+      setNotice(t('vocab.deleted'));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : t('vocab.deleteError'));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return <div className="vocabulary-workspace">
     <div className="vocabulary-toolbar">
       <label className="search-field"><Search size={18} /><span className="sr-only">{t('vocab.search')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('vocab.searchPlaceholder')} /></label>
@@ -287,7 +303,7 @@ export function VocabularyWorkspace({
         return <div className="vocabulary-row" role="row" key={item.id}>
           <div><b lang={item.sourceLanguage}>{item.article && <em>{item.article}</em>} {item.source}</b><small>{item.partOfSpeech || selectedCourse?.language || '—'}</small></div>
           <div><span lang={item.sourceLanguage}>{item.contextSentence || t('vocab.contextPending')}</span>{!item.readyForQuiz && <small>{t('vocab.answerMissing')}</small>}</div>
-          <div className="vocabulary-row__status"><span className={`state-badge state-badge--${item.state}`}>{t(`vocab.state.${item.state}`)}</span>{item.validation && <small className="validation"><CheckCircle2 size={13} /> {item.validation === 'verified' ? t('vocab.verified') : item.validation === 'pending' ? item.readyForQuiz ? t('vocab.editorConfirmed') : t('vocab.answerRequired') : t('vocab.manualReview')}</small>}{canEditItem && !item.readyForQuiz && <button type="button" className="text-link" onClick={() => startAnswerEditor(item)}><PencilLine size={14} /> {t('vocab.addAnswer')}</button>}{canEditItem && item.readyForQuiz && <button type="button" className="text-link" disabled={answerPending} onClick={() => verifyAnswer(item)}><ShieldCheck size={14} /> {t('vocab.verify')}</button>}</div>
+          <div className="vocabulary-row__status"><span className={`state-badge state-badge--${item.state}`}>{t(`vocab.state.${item.state}`)}</span>{item.validation && <small className="validation"><CheckCircle2 size={13} /> {item.validation === 'verified' ? t('vocab.verified') : item.validation === 'pending' ? item.readyForQuiz ? t('vocab.editorConfirmed') : t('vocab.answerRequired') : t('vocab.manualReview')}</small>}{canEditItem && !item.readyForQuiz && <button type="button" className="text-link" onClick={() => startAnswerEditor(item)}><PencilLine size={14} /> {t('vocab.addAnswer')}</button>}{canEditItem && item.readyForQuiz && <button type="button" className="text-link" disabled={answerPending} onClick={() => verifyAnswer(item)}><ShieldCheck size={14} /> {t('vocab.verify')}</button>}{canEditItem && <button type="button" className="text-link text-link--danger" disabled={deletingId === item.id} onClick={() => void deleteWord(item)} aria-label={t('vocab.deleteAria', { word: item.source })}><Trash2 size={14} /> {deletingId === item.id ? t('vocab.deleting') : t('vocab.delete')}</button>}</div>
           {isEditing && <div className="vocabulary-answer-editor"><label>{t('vocab.targetAnswer')}<input value={answerText} onChange={(event) => setAnswerText(event.target.value)} placeholder={t('vocab.targetPlaceholder')} autoFocus /></label><div><button type="button" className="button button--soft button--small" disabled={answerPending} onClick={() => lookupSuggestion(item)}><SearchCheck size={15} /> {answerPending ? t('vocab.checking') : t('vocab.getSuggestion')}</button><button type="button" className="button button--dark button--small" disabled={answerPending || !answerText.trim()} onClick={() => saveAnswer(item)}><CheckCircle2 size={15} /> {t('vocab.saveAnswer')}</button><button type="button" className="button button--plain button--small" disabled={answerPending} onClick={() => { setAnswerEntryId(null); setSuggestion(null); }}>{t('vocab.cancel')}</button></div>{suggestion && <small>{t('vocab.suggestionPrefix')} „{suggestion}“ — {t('vocab.suggestionReview')}</small>}</div>}
         </div>;
       })}

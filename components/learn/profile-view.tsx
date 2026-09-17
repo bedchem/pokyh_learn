@@ -24,7 +24,9 @@ function intensityLevel(answers: number, maxAnswers: number): 0 | 1 | 2 | 3 | 4 
   return 1;
 }
 
-function ContributionHeatmap({ days, locale }: { days: DashboardData['analytics']['yearActivity']; locale: 'de' | 'en' | 'it' }) {
+export type YearActivityDay = { dayKey: string; answers: number; minutes: number };
+
+export function ContributionHeatmap({ days, locale }: { days: YearActivityDay[]; locale: 'de' | 'en' | 'it' }) {
   const { t } = useLearnPreferences();
   const maxAnswers = Math.max(...days.map((day) => day.answers), 1);
 

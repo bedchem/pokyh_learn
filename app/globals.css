@@ -605,6 +605,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .team-member-manager__list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; padding: 0; list-style: none; }
 .team-member-manager__list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-raised); }
 .team-member-manager__name { font-size: 13px; font-weight: 700; color: var(--ink); }
+.team-member-manager__name--link:hover, .team-member-manager__name--link:focus-visible { color: var(--violet); text-decoration: underline; text-underline-offset: 2px; }
 .team-member-manager__role { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; color: var(--ink-muted); background: var(--surface-muted); }
 .team-member-manager__role--owner { color: #7d3ac1; background: color-mix(in srgb, #7d3ac1 16%, transparent); }
 .team-member-manager__role--manager { color: #2158c9; background: color-mix(in srgb, #2158c9 14%, transparent); }
