@@ -419,6 +419,114 @@ this file's actual structure.
 - Test `.env` values and the throwaway compose test project were removed
   after verification.
 
+## Follow-up (same day) — Pokyh AI admin page + a richer, claude.ai-style chat UI
+
+User request (verbatim intent, translated): the backend admin panel should be
+easy to navigate and needs a new "Pokyh AI" tab to configure everything and
+grant access to specific users; separately, the assistant's own chat UI in
+learn.pokyh.com should feel like a real, well-designed chat app similar to
+claude.ai, not a small popup.
+
+### Intent
+
+1. **Backend admin routes** (done first, solo — mechanical, mirrors the
+   existing `/api/admin/learn-config` GET/PATCH block exactly): new
+   `/api/admin/learn-ai/config` (GET/PATCH), `/api/admin/learn-ai/grants`
+   (GET/POST) + `/api/admin/learn-ai/grants/:stableUid` (DELETE) for personal
+   grants, and the same three for `/team-grants` — all `requireAdmin`, same
+   `logger.info('Admin action: ...', ...)` audit convention as every other
+   admin mutation. Live-verified against the running local stack (real admin
+   JWT minted for the existing granted test user, promoted to an `Admin` row)
+   before handing the contract to any further work: `GET config` returned the
+   real current config; `PATCH config` persisted a changed
+   `rateLimitMessagesPerHour`; `GET grants`/`GET team-grants` returned the
+   real grants created in earlier follow-ups; `POST grants` for a
+   previously-ungranted test user succeeded and the new grant appeared in a
+   fresh `GET`.
+2. **Admin SPA "Pokyh AI" page** and **3. Chat UI redesign** — dispatched as
+   two parallel agents via a Workflow run (independent repos/files, no
+   conflict risk), each briefed with the exact live-verified route contract
+   above (for the admin page) or the existing, unchanged conversation routes
+   (for the chat UI — no backend change needed there) and told explicitly to
+   read the existing conventions first (`LearnConfigPage.tsx`'s Card/Toggle/
+   Field style and dark color values for the admin page;
+   `vocabulary-quick-add.tsx`'s focus-trap idiom, `CLAUDE.md`/`UI/CLAUDE.md`'s
+   flat-design rules, and the existing `:root` color tokens for the chat UI),
+   each required to self-verify (`tsc -b --force` for the admin SPA;
+   `typecheck`/`lint`/`build` for the frontend) before reporting done, and
+   explicitly told not to invent UI for unbuilt backend features (no
+   fast/thinking toggle, no upload/voice UI — those are later phases).
+
+Outcome, verification, and any fixes needed after reviewing the workflow's
+output are recorded in the next entry once it completes.
+
+### Outcome
+
+A dispatched Workflow (two parallel agents) failed immediately — both hit a
+session usage limit ("You've hit your session limit · resets 5pm
+(Europe/Rome)") before writing anything. Confirmed via `git status`/`git
+diff --stat` in both repos that nothing was left behind (zero files
+touched); no cleanup was needed. Built both pieces directly instead:
+
+- **Admin SPA**: `admin/src/pages/LearnAiPage.tsx` (new), matching
+  `LearnConfigPage.tsx`'s exact Card/Toggle/Field style and dark color
+  values — a config card (model/context/rate-limit/timeout fields, the
+  `enabled` kill-switch), a personal-grants card (grant-by-username form,
+  active/revoked lists, revoke button), a team-grants card (grant-by-team
+  `<select>` populated from the existing `adminApi.listLearnTeams()`, same
+  active/revoked pattern). New types (`LearnAiConfigValues`, `LearnAiGrant`,
+  `LearnAiTeamGrant`) and 7 `adminApi` methods added; new `/learn/ai` route
+  and "Pokyh AI" nav item (`Bot` icon) wired into `App.tsx`/`Layout.tsx`; a
+  cross-link added from the existing Learn config page.
+- **Chat UI redesign**: `components/learn/ai-assistant.tsx` rewritten into a
+  two-pane, claude.ai-inspired layout — a conversation sidebar (new-chat
+  button, switchable history list with a two-click delete confirm) and a
+  main thread/composer pane. Desktop: `min(1100px, 92vw)` × `min(85vh,
+  780px)` centered overlay (up from the original 380px corner box). Mobile:
+  full-screen, sidebar becomes a slide-in drawer. Composer is now an
+  auto-growing `<textarea>` (Enter to send, Shift+Enter for a newline) with
+  a typing indicator (three pulsing dots, static under
+  `prefers-reduced-motion`) shown while waiting for a reply. Added optional
+  voice dictation into the composer via the browser's native Web Speech API
+  (`SpeechRecognition`/`webkitSpeechRecognition`) — no new dependency, no
+  backend change; the mic button only renders when the browser actually
+  supports it (progressive enhancement, since Firefox/Safari don't). All
+  new colors use existing `:root` tokens; 10 new `ai.*` i18n keys added to
+  all three locales. Explicitly did **not** build file/image upload UI or
+  "sees the current page" contextual awareness — see "Deliberately not done
+  yet" below.
+- **Model re-check on config change** (found while addressing the user's
+  "don't download the model twice" concern): `ensureModelReady()` was only
+  ever invoked once, at boot. If an admin changed `modelName` via the new
+  page, nothing would re-trigger a check/pull for the new model — `PATCH
+  /api/admin/learn-ai/config` now calls `void ensureModelReady()` after
+  saving. It reads the model name fresh and only calls `/api/pull` if that
+  model isn't already present, so this can never cause a redundant
+  download — confirmed live: a PATCH with the *same* model name produced no
+  `learn_ai_model_pull_start` log line, only the ordinary config-updated
+  audit line. The original "never re-downloads on restart" behavior
+  (`ollama_data` named volume, `/api/tags` check before `/api/pull`) was
+  re-confirmed unchanged by rebuilding/recreating `app` again and observing
+  no pull attempt.
+
+### Deliberately not done yet (explicitly deferred, not silently dropped)
+
+The user's messages during this batch also asked for: full course
+generation from uploaded data, file/image upload in chat, and giving the
+assistant visibility into "everything the user sees" on the current page.
+None of these are built. Reasoning: file upload has no backend support at
+all yet (no attachment model/route/storage — this is Phase 2 of the original
+plan, and building it hastily without the same validation/security rigor as
+everything else in this feature — magic-byte checks, size limits, storage
+isolation — would be exactly the kind of corner-cutting this project's own
+release-gate rules forbid). Course generation from uploaded material and
+page-content awareness are both new, non-trivial capabilities that need
+their own deliberate design (what exactly is captured/sent to the model,
+how authored-content review still works, what the privacy/prompt-injection
+surface looks like) rather than being bolted on under time pressure. Voice
+input was still deliverable today via the browser's own Web Speech API
+(client-side only, no new infra), so that part shipped.
+
 ## Release state
 
 Committed, not pushed, per the user's explicit confirmation of scope
