@@ -293,6 +293,37 @@ to production — a genuinely resource-constrained host would see cold-start
 latency at or beyond the newly-raised timeout defaults, or memory pressure
 Ollama isn't currently bounded against beyond the Docker `mem_limit` itself.
 
+## Follow-up (same day) — team-level access grants
+
+User follow-up (verbatim intent, translated): access should also be
+configurable per team in the backend, not only per person. Added
+`LearnAiTeamAccessGrant` (`pokyh-backend/prisma/schema.prisma`) — a whole-team
+grant, additive to the personal `LearnAiAccessGrant`, either sufficient on its
+own. `hasActiveAiGrant()` (`learnAiAccess.ts`) now checks both: a personal
+grant, or membership (via `LearnTeamMember`) in a team holding an active team
+grant. New `grantAiAccessToTeam`/`revokeAiAccessFromTeam`/
+`listAiTeamAccessGrants`, and matching interim CLI scripts
+`scripts/grant-ai-access-team.js`/`revoke-ai-access-team.js` (resolve by team
+ID or exact name, same style as the personal-grant scripts) until Phase 1's
+admin UI can manage both grant types from a proper list. Updated
+`docs/api-contract.md`, `docs/architecture.md`, `docs/decisions.md` (ADR-016),
+and the backend `README.md` to describe both grant types consistently.
+`admin`-page/UI restructuring for Phase 1 (the other half of this same
+follow-up request) remains a Phase 1 design item, not something reworked into
+Phase 0's already-shipped popup.
+
+### Verification
+
+- `npx prisma generate` + `npx tsc --noEmit` clean in `pokyh-backend` after
+  the schema/service additions.
+- Rebuilt and restarted the same live local stack; `"Database ready (schema
+  applied, connected)"` confirmed the new table applied automatically.
+- Real end-to-end test: created a fresh user with **no personal grant**,
+  added them to a new team → `POST /learn/ai/conversations` correctly `403`.
+  Granted the team access via `LearnAiTeamAccessGrant` → the exact same user,
+  same token, same route → `201`, purely from team membership. Confirms the
+  two grant paths are genuinely independent and both enforced correctly.
+
 ## Release state
 
 Committed, not pushed, per the user's explicit confirmation of scope

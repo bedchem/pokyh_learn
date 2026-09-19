@@ -350,9 +350,12 @@ needed to start as a controlled rollout rather than a platform-wide switch.
 
 **Decision:** Run the model entirely in a self-hosted, CPU-only Ollama
 container on the existing Dokploy host — no third-party AI API, no GPU
-dependency. Gate access with a per-user `LearnAiAccessGrant` pilot allowlist
-(an explicit administrator action, not a global `LearnAiConfig` boolean,
-which remains a separate, independent kill-switch). Assemble any personal
+dependency. Gate access with a per-user `LearnAiAccessGrant` pilot allowlist,
+or a `LearnAiTeamAccessGrant` covering every current and future member of a
+team at once (both an explicit administrator action, not a global
+`LearnAiConfig` boolean, which remains a separate, independent kill-switch —
+either grant is sufficient, both are additive to the personal review below,
+never a replacement for it). Assemble any personal
 context (due reviews, active-course progress, streak) fresh per request,
 scoped strictly to the requesting `stableUid`, never cached across users and
 never written into any shared/knowledge-base table. The assistant never

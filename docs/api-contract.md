@@ -145,10 +145,12 @@ profile; no role, access or legal-notice state can be imported.
 ## AI assistant ("KIbo")
 
 Self-hosted, CPU-only Ollama-backed assistant. Disabled by default
-(`LEARN_AI_ENABLED=false`) and, even when enabled, gated per user by a
-`LearnAiAccessGrant` pilot allowlist — there is no global on/off switch for
-end users. `GET /me` includes a `canUseAiAssistant` hint (grant present AND
-the admin kill-switch on); it is a capability hint only, never enforcement.
+(`LEARN_AI_ENABLED=false`) and, even when enabled, gated by a
+`LearnAiAccessGrant` pilot allowlist for the person or a
+`LearnAiTeamAccessGrant` covering their whole team — there is no global
+on/off switch for end users, and either grant is sufficient on its own.
+`GET /me` includes a `canUseAiAssistant` hint (a grant present AND the admin
+kill-switch on); it is a capability hint only, never enforcement.
 
 | Method | Path | Required access | Behavior |
 | --- | --- | --- | --- |

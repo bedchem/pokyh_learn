@@ -283,12 +283,15 @@ Browser -> BFF catch-all (/api/learn/ai/*, unchanged proxy logic,
   -> Ollama (internal Docker network only, e.g. http://ollama:11434)
 ```
 
-- **Access** is a per-user `LearnAiAccessGrant` pilot allowlist, administered
-  like a course-editor grant — there is no platform-wide toggle for end
-  users. `LearnAiConfig.enabled` is a separate, independent administrator
-  kill-switch; both must allow a request through. `GET /me`'s
-  `canUseAiAssistant` combines both as a capability hint only — every
-  `/learn/ai/*` route re-checks the grant itself.
+- **Access** is a per-user `LearnAiAccessGrant` pilot allowlist, or a
+  `LearnAiTeamAccessGrant` covering every current and future member of a
+  team at once — both administered like a course-editor grant, either is
+  sufficient, and there is no platform-wide toggle for end users.
+  `LearnAiConfig.enabled` is a separate, independent administrator
+  kill-switch; it and at least one grant must both allow a request through.
+  `GET /me`'s `canUseAiAssistant` combines the kill-switch with the calling
+  user's own grant status as a capability hint only — every `/learn/ai/*`
+  route re-checks access itself.
 - **Model runtime**: the stock `ollama/ollama` image, CPU-only (no GPU device
   is ever requested in the compose file), on an internal-only Docker network,
   behind a Compose profile (`ai`) so an existing deployment that has not
