@@ -142,9 +142,9 @@ The exported `profile` may include `locale` and `theme` alongside daily goal
 and timezone. Importing these values remains bounded to the caller's own
 profile; no role, access or legal-notice state can be imported.
 
-## AI assistant ("KIbo")
+## AI vocabulary trainer
 
-Self-hosted, CPU-only Ollama-backed assistant. Disabled by default
+Self-hosted, CPU-only Ollama-backed vocabulary-sentence trainer. Disabled by default
 (`LEARN_AI_ENABLED=false`) and, even when enabled, gated by a
 `LearnAiAccessGrant` pilot allowlist for the person or a
 `LearnAiTeamAccessGrant` covering their whole team — there is no global
@@ -154,42 +154,16 @@ kill-switch on); it is a capability hint only, never enforcement.
 
 | Method | Path | Required access | Behavior |
 | --- | --- | --- | --- |
-| `GET` | `/ai/access` | Authenticated | Reports whether this account currently has assistant access, whether the model has finished its startup pull, and the current per-hour message limit. |
-| `GET` | `/ai/conversations` | Pilot grant | Lists the caller's own conversations, most recent first. |
-| `POST` | `/ai/conversations` | Pilot grant | Starts a new conversation. |
-| `GET` | `/ai/conversations/:id` | Pilot grant + ownership | Returns that conversation's messages. |
-| `DELETE` | `/ai/conversations/:id` | Pilot grant + ownership | Permanently deletes a conversation. |
-| `POST` | `/ai/conversations/:id/messages` | Pilot grant + ownership | Sends a message; grades nothing itself, returns the assistant's reply. Accepts an `idempotencyKey` — a retry with the same key returns the original exchange rather than calling the model (and counting against quota) again. Optionally accepts up to 3 `attachments` (`{ filename, dataBase64 }` — images and short plain-text files only) and a `pageContext` (`{ path, title }`, the current route/page title only, never raw screen content). |
+| `POST` | `/ai/training/sentences` | Pilot grant + vocabulary access | Accepts only a server-authorized `entryId` and direction, then returns one short AI sentence plus a server-only answer key reference. No arbitrary prompt, file, conversation or page context is accepted. |
+| `POST` | `/ai/training/sentences/:promptId/check` | Pilot grant + prompt ownership | Checks the learner's translation against the server-held key, returns correctness, and updates the adaptive review schedule exactly once. |
 
-The assistant never grades a quiz, decides correctness, or writes to any
-other Learn record — it is purely conversational. Personal context (due
-review count, active-course progress, streak) may be included in its prompt
-per request, assembled fresh and scoped strictly to the calling `stableUid`;
-it is never cached across users and never stored in any shared/knowledge-base
-table. Conversations and messages are durable in MySQL (`LearnAiConversation`,
-`LearnAiMessage`); message content is never written to the audit log, only
-outcome metadata (mode, token counts, which tools ran, attachment count).
-
-**Attachments** (`LearnAiAttachment`, disabled by default via
-`LearnAiConfig.uploadsEnabled`): the claimed filename/MIME type is never
-trusted — the real kind is derived from the file's actual bytes (magic-byte
-signatures for images; a content-sniff rejecting anything that looks like
-binary data for text) before it is stored or sent to the model. Images go to
-Ollama's native vision input; short text files are inlined into the prompt,
-clearly delimited as reference material, never as an instruction. Content
-lives directly in MySQL, bounded by `LearnAiConfig.uploadMaxBytes` (default
-4MB, admin-configurable up to 20MB) — no separate object storage.
-
-**Page context**: the assistant can be told which Pokyh Learn page/route the
-learner is currently on so it can help explain it — deliberately limited to
-a route path and page title, never raw DOM/screen content (which could leak
-another learner's visible data or become a much larger prompt-injection
-surface). Also treated as untrusted reference material by the model.
-
-Not yet mounted (tracked as later phases of the same feature): PDF/DOCX
-attachment parsing, an admin-curated site knowledge base, and a live
-multi-source web-search tool. Each is additive and independently gated by
-its own `LearnAiConfig` flag when it ships.
+The model receives only the selected vocabulary word and languages. It is
+asked for compact JSON with thinking disabled; the server validates the result
+before storing it as a 15-minute training prompt. The client never receives
+the expected translation until an incorrect result. Each entry's approved
+vocabulary answer remains the source of truth for ordinary card grading;
+dictionary verification remains limited to the configured allowlisted
+providers, with no arbitrary web scraping.
 
 ## Teams and Learn administration
 
@@ -229,13 +203,11 @@ Learn management data. Approval references and secrets are never returned.
 - platform-wide Learn backup/restore and audit-feed UI;
 - Redis uses beyond the optional private course-specific analytics response
   cache, including queues and distributed idempotency storage;
-- automatic content generation, live AI grading, or a writing-feedback
-  provider — still true even with the AI assistant above mounted: it is
-  conversational only and never decides a quiz outcome or authors course
-  content;
-- AI assistant file/image uploads, voice memos, a curated site knowledge
-  base, and live web search (see "AI assistant" above — each is a later,
-  separately gated phase of that same feature, not mounted yet).
+- general AI chat, automatic course content generation, arbitrary web
+  scraping, or a writing-feedback provider — the mounted trainer is limited
+  to a selected vocabulary entry and never decides a quiz outcome;
+- file/image uploads, voice memos, a curated site knowledge base, and live
+  web search for the trainer.
 
 MySQL is the durable authority. Any future cache or provider must be a
 recoverable optimization that cannot lose or silently alter progress,

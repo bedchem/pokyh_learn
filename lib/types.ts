@@ -29,6 +29,7 @@ export interface Course {
   vocabularyCount: number;
   enrolledCount?: number;
   progress?: number;
+  completedSections?: number;
   nextLesson?: string;
   ownerName?: string;
   canEdit?: boolean;

@@ -72,8 +72,7 @@ mode. It is disabled by default and must never be enabled in production.
 | `LEARN_API_TIMEOUT_MS` | yes | BFF request deadline |
 | `LEARN_BFF_BODY_LIMIT_BYTES` | yes | maximum ordinary JSON body accepted by the public BFF |
 | `LEARN_BFF_IMPORT_BODY_LIMIT_BYTES` | yes | maximum JSON library-import body accepted by the public BFF |
-| `LEARN_AI_API_TIMEOUT_MS` | optional | longer BFF deadline for `/api/learn/ai/*` (defaults to 220s); a self-hosted, CPU-only assistant reply can take longer than a normal API call, especially a cold start when the model isn't already loaded in Ollama |
-| `LEARN_BFF_AI_BODY_LIMIT_BYTES` | optional | larger body limit for `/api/learn/ai/*` (defaults to 20MB) to fit base64-encoded chat attachments; the backend's `LearnAiConfig.uploadMaxBytes` remains the authoritative per-file limit |
+| `LEARN_AI_API_TIMEOUT_MS` | optional | longer BFF deadline for `/api/learn/ai/*` (defaults to 220s); a self-hosted, CPU-only vocabulary-sentence request can take longer than a normal API call, especially on a cold model start |
 | `NEXT_PUBLIC_LEARN_DEMO_MODE` | local only | renders non-production presentation data |
 
 The WebUntis sign-in form reads its required acknowledgement state, public

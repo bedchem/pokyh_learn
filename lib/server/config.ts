@@ -50,12 +50,6 @@ export function getServerConfig() {
     // in testing, and the BFF must not cut the connection before the backend
     // itself would have timed out.
     aiTimeoutMs: boundedPositiveInteger('LEARN_AI_API_TIMEOUT_MS', 220_000, 600_000),
-    // Chat attachments (images, short text files) travel as base64 JSON —
-    // ~33% inflation over the backend's own LearnAiConfig.uploadMaxBytes
-    // (4MB default), plus headroom for up to 3 attachments and the rest of
-    // the request. The backend remains the authoritative size limit; this
-    // just needs to not be the thing that rejects a legitimate request first.
-    bffAiBodyLimitBytes: boundedPositiveInteger('LEARN_BFF_AI_BODY_LIMIT_BYTES', 20 * 1024 * 1024, 100 * 1024 * 1024),
     sessionCookieName: optional('LEARN_SESSION_COOKIE_NAME', 'pokyh_learn_session'),
     refreshCookieName: optional('LEARN_REFRESH_COOKIE_NAME', 'pokyh_learn_refresh'),
     csrfCookieName: optional('LEARN_CSRF_COOKIE_NAME', 'pokyh_learn_csrf'),

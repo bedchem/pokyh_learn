@@ -9,8 +9,8 @@ section completion-derived progress, course/section authoring, strict personal
 JSON portability, a separate Learn administration surface, an optional explicit
 dictionary-suggestion adapter, private daily learning analytics, an optional
 Redis-backed course-specific analytics cache, and — as of Phase 0 — a
-self-hosted, CPU-only, pilot-gated AI assistant (text chat only; see
-"AI assistant" below). References below to provider snapshots, audit models,
+self-hosted, CPU-only, pilot-gated AI vocabulary trainer (see
+"AI vocabulary trainer" below). References below to provider snapshots, audit models,
 platform backup jobs, feature flags, richer quiz sessions, or Redis uses
 beyond that narrow analytics cache are target architecture unless that
 contract explicitly marks them mounted.
@@ -268,18 +268,18 @@ add an answer variant, keep a manual answer, or flag a conflict. Quiz grading
 uses the approved course answer set even if provider verification is pending or
 unavailable.
 
-## AI assistant ("KIbo")
+## AI vocabulary trainer
 
-A self-hosted, CPU-only Ollama assistant, reachable as a bottom-right popup.
-See [ADR-016](./decisions.md#adr-016--self-host-the-ai-assistant-gate-it-per-user-and-never-let-it-decide-correctness)
-for the reasoning; this section is the current shape.
+A self-hosted, CPU-only Ollama trainer, available only from a vocabulary
+card. There is no general chat, conversation history, attachment, page-context,
+or browsing surface.
 
 ```text
 Browser -> BFF catch-all (/api/learn/ai/*, unchanged proxy logic,
            a longer AI-specific timeout) -> api.pokyh.com/learn/ai/*
   -> requireAiPilotAccess (per-user grant, not a global switch)
-  -> LearnAiConversation / LearnAiMessage (MySQL, source of truth)
-  -> personalized context, stableUid-scoped, read-only, assembled per request
+  -> server authorizes LearnVocabularyEntry + course access
+  -> LearnAiTrainingPrompt (short-lived, server-only expected translation)
   -> Ollama (internal Docker network only, e.g. http://ollama:11434)
 ```
 
@@ -302,46 +302,24 @@ Browser -> BFF catch-all (/api/learn/ai/*, unchanged proxy logic,
   Node application's own boot sequence (`ensureModelReady()` in
   `learnAiOllama.ts`), fire-and-forget — never awaited before the HTTP server
   starts listening, since a first-boot multi-GB model pull must not delay
-  the rest of Pokyh/Learn. Chat requests check readiness themselves and
+  the rest of Pokyh/Learn. Training requests check readiness themselves and
   return a friendly 503 until the pull completes.
 - **Context window**: `LearnAiConfig.contextTokens` (`num_ctx` sent to
   Ollama) is deliberately kept small by default and admin-configurable, not
   left at the model's advertised maximum — RAM for a CPU-quantized model
   grows sharply with context length, so an unbounded default would silently
   break the resource-efficiency requirement on a shared host.
-- **Personalized context** (due review count, active-course progress,
-  streak) is assembled fresh per request by a dedicated, read-only,
-  `stableUid`-scoped function. It is never cached across users and never
-  written into any shared/knowledge-base table — the one place personal
-  learning data enters a prompt is scoped exactly as tightly as the rest of
-  this platform's privacy rules require.
 - **Quota**: MySQL (`LearnAiUsageCounter`, an hour-floored per-user counter)
   is the authoritative rate limit, enforced in the same transaction that
-  persists a message — it holds correctly even without Redis. A baseline
-  `express-rate-limit` instance additionally bounds raw request rate.
-- **Idempotency**: message submission accepts an `idempotencyKey`; a retry
-  with the same key returns the already-stored exchange instead of calling
-  the model (and counting against quota) a second time, mirroring
-  `LearnQuizAttempt`'s pattern.
-- **Audit**: `learnAudit()` records that a message was sent, its mode, and
-  token counts — never the message content itself.
-- **Uploads and page context**: file/image attachments (`LearnAiAttachment`,
-  `LearnAiConfig.uploadsEnabled`, off by default) are validated by the file's
-  actual bytes, never the client's claimed type — magic-byte signatures for
-  images, a binary-content-sniff rejection for anything claiming to be text.
-  Images use Ollama's native vision input; text is inlined as bounded,
-  delimited reference context. Content lives directly in MySQL, bounded by
-  `uploadMaxBytes` (default 4MB). Page context (`{ path, title }` only, never
-  raw DOM/screen content) lets the assistant help explain the page the
-  learner is currently on, also treated as untrusted reference material.
-  `/learn/ai` has its own larger Express body-size limit (`BODY_LIMIT_AI`)
-  ahead of the general default, since attachments travel as base64 JSON.
-- **Not yet mounted**: PDF/DOCX attachment parsing (needs a new, separately
-  reviewed parsing dependency), voice-memo transcription (planned as a
-  local, self-hosted Whisper step rather than depending on Ollama's own
-  audio-input maturity), an admin-curated site knowledge base, and a live
-  multi-source web-search tool. Each ships as its own phase with its own
-  `LearnAiConfig` flag and its own threat-model review before release.
+  persists a training request — it holds correctly even without Redis. An
+  in-process cap and Ollama's matching queue bound concurrent generations.
+- **Answer authority**: the model produces only a candidate sentence and
+  translation in JSON (`think: false`). The server validates and keeps the
+  expected translation private, then updates the adaptive review row through
+  an atomic one-time result claim. Free-form learner content never reaches
+  the model and ordinary vocabulary grading stays on the approved course key.
+- **Audit**: `learnAudit()` records only prompt identifiers, direction and
+  correctness — never the sentence or learner answer.
 
 ## Caching, batching, and performance
 

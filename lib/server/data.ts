@@ -162,7 +162,10 @@ function mapCourse(course: BackendCourse, enrollment?: BackendEnrollment | null,
     vocabularyCount: course._count?.vocabulary ?? 0,
     enrolledCount: course._count?.enrollments,
     progress: enrollment?.progressPercent,
-    nextLesson: sections?.find((section) => section.type !== 'QUIZ')?.title ?? sections?.[0]?.title,
+    completedSections: enrollment?.completedSections ?? 0,
+    nextLesson: sections?.[Math.min(Math.max(enrollment?.completedSections ?? 0, 0), Math.max((sections?.length ?? 1) - 1, 0))]?.title
+      ?? sections?.find((section) => section.type !== 'QUIZ')?.title
+      ?? sections?.[0]?.title,
     canEdit: permissions?.canEdit,
     canManage: permissions?.canManage,
     isEnrolled: Boolean(enrollment),
@@ -387,7 +390,7 @@ export async function getCourseOptions(token?: string | null): Promise<Course[]>
 
 export async function getLearnIdentity(token?: string | null): Promise<{ username: string; isAdmin: boolean; canUseAiAssistant: boolean } | null> {
   if (!token) return null;
-  if (isDemoMode()) return { username: 'Demo', isAdmin: true, canUseAiAssistant: false };
+  if (isDemoMode()) return { username: 'Demo', isAdmin: true, canUseAiAssistant: true };
   const payload = await backendFetch<{ user: { username: string }; isAdmin: boolean; canUseAiAssistant?: boolean }>(pathFor('/me'), {
     token,
     cache: 'no-store',

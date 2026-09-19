@@ -1,6 +1,7 @@
 'use client';
 
 import { CirclePlay, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -28,7 +29,7 @@ export function EnrollmentButton({ courseId, courseSlug, continueHref, enrolled 
   }
 
   if (enrolled) {
-    return <a href={continueHref} className="button button--dark"><CirclePlay size={17} /> {t('enrollment.continue')}</a>;
+    return <Link href={continueHref} className="button button--dark"><CirclePlay size={17} /> {t('enrollment.continue')}</Link>;
   }
 
   return <span className="enrollment-action"><button className="button button--dark" type="button" onClick={enroll} disabled={pending}><Plus size={17} /> {pending ? t('enrollment.adding') : t('enrollment.add')}</button>{error && <small role="alert">{error}</small>}</span>;

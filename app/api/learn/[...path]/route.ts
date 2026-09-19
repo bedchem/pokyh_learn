@@ -83,10 +83,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const endpoint = safePath(config.apiPrefix, path, search);
     const bodyLimit = path.join('/') === 'library/import'
       ? config.bffImportBodyLimitBytes
-      : path[0] === 'ai' ? config.bffAiBodyLimitBytes : config.bffBodyLimitBytes;
+      : config.bffBodyLimitBytes;
     const body = method === 'GET' || method === 'HEAD' ? undefined : (await readValidatedJsonBody(request, bodyLimit)).raw;
     const key = idempotencyHeader(request);
-    // A self-hosted, CPU-only assistant reply can legitimately take much
+    // A self-hosted, CPU-only vocabulary-sentence reply can legitimately take much
     // longer than a normal Learn API call.
     const timeoutMs = path[0] === 'ai' ? config.aiTimeoutMs : undefined;
     const requestBackend = (accessToken: string | null) => backendFetch<unknown>(endpoint, {

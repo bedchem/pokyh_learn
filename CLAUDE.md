@@ -510,8 +510,7 @@ or production cookie.
 | `LEARN_API_TIMEOUT_MS` | server only | BFF backend deadline |
 | `LEARN_BFF_BODY_LIMIT_BYTES` | server only | bounded ordinary JSON body size accepted by the BFF |
 | `LEARN_BFF_IMPORT_BODY_LIMIT_BYTES` | server only | separately bounded library-import JSON body size accepted by the BFF |
-| `LEARN_AI_API_TIMEOUT_MS` | server only | longer BFF deadline for `/api/learn/ai/*`, since a self-hosted CPU-only assistant reply can take longer than a normal call |
-| `LEARN_BFF_AI_BODY_LIMIT_BYTES` | server only | larger body limit for `/api/learn/ai/*` to fit base64-encoded chat attachments; the backend's config remains the authoritative per-file limit |
+| `LEARN_AI_API_TIMEOUT_MS` | server only | longer BFF deadline for `/api/learn/ai/*`, since a self-hosted CPU-only vocabulary-sentence reply can take longer than a normal call |
 | `NEXT_PUBLIC_LEARN_DEMO_MODE` | local development only | enables static visual demo data |
 
 The production backend additionally configures at least:

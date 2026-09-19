@@ -334,45 +334,28 @@ production activation, the controller/school must complete the documented
 review in [legal readiness](./legal-readiness.md), including actual data flows,
 hosting/subprocessors, retention and rights handling.
 
-## ADR-016 — Self-host the AI assistant, gate it per user, and never let it decide correctness
+## ADR-016 — Self-host a vocabulary-only trainer, gate it per user, and keep grading authoritative
 
-**Status:** Phase 0 implemented (text chat, pilot grants, personalized
-context). File/image uploads, voice memos, a curated site knowledge base, and
-live web search are later, separately gated phases of the same feature.
+**Status:** Implemented. This supersedes the earlier general-chat shape.
 
-**Context:** The product wants a Pokyh-Learn-aware chat assistant ("KIbo"),
-reachable as a bottom-right popup, that can also ground answers in a user's
-own progress. Sending learner conversations or their own progress data to a
-third-party LLM API would be a new, unreviewed data-protection surface. The
-platform's existing "advisory only, never authoritative" rule for the
-MyMemory dictionary adapter is the closest precedent, but access here also
-needed to start as a controlled rollout rather than a platform-wide switch.
+**Context:** Learners need optional example sentences while practising a
+selected vocabulary word, not a general chat surface. A free-form prompt,
+uploaded document, personal-context feed, or browser tool would widen the
+privacy and prompt-injection boundary without improving vocabulary grading.
 
-**Decision:** Run the model entirely in a self-hosted, CPU-only Ollama
-container on the existing Dokploy host — no third-party AI API, no GPU
-dependency. Gate access with a per-user `LearnAiAccessGrant` pilot allowlist,
-or a `LearnAiTeamAccessGrant` covering every current and future member of a
-team at once (both an explicit administrator action, not a global
-`LearnAiConfig` boolean, which remains a separate, independent kill-switch —
-either grant is sufficient, both are additive to the personal review below,
-never a replacement for it). Assemble any personal
-context (due reviews, active-course progress, streak) fresh per request,
-scoped strictly to the requesting `stableUid`, never cached across users and
-never written into any shared/knowledge-base table. The assistant never
-grades a quiz, decides a correctness result, or authors course content — the
-platform's own curated answers remain the sole grading authority, matching
-ADR-006/ADR-007. Ollama's own context window (`num_ctx`) is deliberately
-capped by admin-configurable policy rather than left at the model's
-advertised maximum, since RAM for a CPU-quantized model grows sharply with
-context length — an unbounded default would silently violate the platform's
-resource-efficiency expectations on a shared, modestly sized host.
+**Decision:** Run one self-hosted CPU-only Ollama model on the internal Docker
+network. The model receives only a server-authorized vocabulary word plus its
+two languages, and produces strict JSON with thinking disabled. The server
+validates and stores the proposed sentence and expected translation in a
+short-lived `LearnAiTrainingPrompt`; it keeps the answer hidden until an
+incorrect check and atomically updates the adaptive-review row once. Access
+requires the global kill-switch plus a personal or team pilot grant. The
+server-side and Ollama concurrency caps are configured together for a
+class-sized queue. Dictionary verification stays with allowlisted providers;
+the trainer cannot browse or scrape arbitrary sites.
 
-**Consequences:** No learner conversation or personal-progress data ever
-leaves Pokyh-controlled infrastructure. A pilot can be widened gradually by
-granting more accounts without a redeploy. A host with insufficient RAM/CPU
-degrades to a clear "assistant is still starting up" or "currently disabled"
-response rather than starving the rest of Pokyh Learn, because the model
-container is not a hard dependency of the main application. Every later
-phase (uploads, voice, knowledge base, live web search) must independently
-justify its own resource cost and threat model before it ships, rather than
-inheriting blanket trust from this decision.
+**Consequences:** There is no general chat, conversation history, attachment,
+page-context, or web-search surface. The approved course answer set remains
+authoritative for normal vocabulary grading, while the AI prompt is scoped to
+one vocabulary-training activity. Slow or unavailable model work produces a
+bounded retryable response without affecting non-AI Learn routes.

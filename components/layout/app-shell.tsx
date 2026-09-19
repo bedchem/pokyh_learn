@@ -23,7 +23,6 @@ import { BrandMark } from '@/components/ui/brand-mark';
 import { Avatar } from '@/components/ui/avatar';
 import { PreferenceControls } from '@/components/layout/preference-controls';
 import { QuickAddVocabularyButton } from '@/components/learn/vocabulary-quick-add';
-import { AiAssistantWidget } from '@/components/learn/ai-assistant';
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
 import { learnApi, logout } from '@/lib/client/api';
 
@@ -258,7 +257,6 @@ export function AppShell({
         })}
       </nav>}
 
-      {identity?.canUseAiAssistant && <AiAssistantWidget />}
     </div>
   );
 }
