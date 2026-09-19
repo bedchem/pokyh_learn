@@ -332,6 +332,10 @@ Committed, not pushed, per the user's explicit confirmation of scope
 both repos, confirmed rather than assumed):
 
 - `pokyh-backend`: `f4e1b1901b915ce9f41e300e3dd96fc9bdae2572` — "Add Phase 0
-  of the self-hosted AI assistant (\"KIbo\")".
+  of the self-hosted AI assistant (\"KIbo\")"; `84bb5bcae0129708fa60caf08c35f2737e9268ea`
+  — "Add team-level AI assistant access grants".
 - `pokyh_learn-frontend`: `06afdb433c1ed6ffa29decc4e9af25e0cd4b0cc3` — "Add
-  Phase 0 frontend for the self-hosted AI assistant (\"KIbo\")".
+  Phase 0 frontend for the self-hosted AI assistant (\"KIbo\")";
+  `c0b7d9848edae98ac0bc5c24234fedd66119a3b1` — "Record Phase 0 AI assistant
+  commit outcome in this worklog"; `216e1cbc29547b617d6f4d15f03164883923108e`
+  — "Document team-level AI assistant access grants".
