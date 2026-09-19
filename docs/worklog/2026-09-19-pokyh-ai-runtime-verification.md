@@ -16,6 +16,15 @@
 - Risk / next step: Queued work persists through browser/BFF disconnects and is recovered on app restart. It still needs the configured local Ollama service and model to be available; a model/provider failure becomes a safe retryable status and refunds the quota reservation. No code or deployment has been committed or pushed.
 - Release state: uncommitted
 
+## 2026-09-19 19:50 CEST — unique AI sentences, synonym-aware checks, and search shortcut
+
+- Intent: Ensure repeated AI practice does not recycle the same sentence, accept valid full-sentence synonym translations, and make the advertised search keyboard shortcut real.
+- Outcome: Each AI training prompt now has a SHA-256 sentence fingerprint unique to its learner and vocabulary entry. The generator uses a new server-created variation token for every attempt and retries rather than returning a normalized duplicate. Exact server-key matching still runs first; only an exact miss gets one strict, JSON-only local-model semantic-equivalence pass. That evaluator receives the original sentence, the private reference translation, and the learner answer only as untrusted reference data; it accepts full-meaning synonyms but rejects incomplete or meaning-changing answers. If the model is unavailable, the normal deterministic result remains safe.
+- UX: ⌘/Ctrl+K now navigates authenticated learners to the catalogue and focuses the functional catalogue search input. The top-bar search trigger uses the same route. Existing Escape/menu and native form keyboard behavior remain unchanged.
+- Capacity/security: Sentence generation and semantic evaluation share the configured 10-slot model cap. Semantic checks count against the server-owned per-user model-work quota; answers and generated sentences remain out of audit metadata.
+- Verification: Backend Prisma validation/generation and TypeScript build passed. Frontend typecheck, lint, and production build passed. Docker rebuilt successfully after one transient package-registry reset; the healthy app applied the two additive prompt-fingerprint schema statements and the live Prisma diff is empty. Browser inspection loaded the catalogue focus route with its searchable input and filters present.
+- Release state: uncommitted
+
 ## 2026-09-19 19:38 CEST — replace general AI chat with vocabulary-only trainer
 
 - Intent: Retire the general AI chat at the learner's request and retain AI only as an optional, server-authoritative vocabulary-sentence exercise.

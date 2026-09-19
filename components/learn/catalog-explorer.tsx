@@ -2,7 +2,8 @@
 
 import { Filter, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { CourseCard } from '@/components/ui/course-card';
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
@@ -10,6 +11,8 @@ import type { Course } from '@/lib/types';
 
 export function CatalogExplorer({ courses, authenticated = false }: { courses: Course[]; authenticated?: boolean }) {
   const { locale, t } = useLearnPreferences();
+  const searchParams = useSearchParams();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [level, setLevel] = useState('ALL');
   const [language, setLanguage] = useState('ALL');
@@ -21,10 +24,15 @@ export function CatalogExplorer({ courses, authenticated = false }: { courses: C
     return matchesSearch && (level === 'ALL' || course.level === level) && (language === 'ALL' || course.language === language);
   }), [courses, language, level, locale, query]);
 
+  useEffect(() => {
+    if (searchParams.get('focusSearch') !== '1') return;
+    searchInputRef.current?.focus();
+  }, [searchParams]);
+
   return (
     <div className="catalog-explorer">
       <div className="catalog-toolbar">
-        <label className="search-field"><Search size={18} /><span className="sr-only">{t('catalog.searchLabel')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('catalog.searchPlaceholder')} /></label>
+        <label className="search-field"><Search size={18} /><span className="sr-only">{t('catalog.searchLabel')}</span><input ref={searchInputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('catalog.searchPlaceholder')} /></label>
         <div className="filter-group" aria-label={t('catalog.filterLabel')}><Filter size={16} /><select value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select><select value={level} onChange={(event) => setLevel(event.target.value)}>{levels.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
       </div>
       <div className={`catalog-result-line${authenticated ? '' : ' catalog-result-line--public'}`}><span>{filtered.length === 1 ? t('catalog.resultOne') : t('catalog.resultMany', { count: String(filtered.length) })}</span>{authenticated && <Link href="/create/course" className="button button--soft button--small"><Plus size={16} /> {t('catalog.create')}</Link>}</div>

@@ -159,11 +159,13 @@ kill-switch on); it is a capability hint only, never enforcement.
 
 The model receives only the selected vocabulary word and languages. It is
 asked for compact JSON with thinking disabled; the server validates the result
-before storing it as a 15-minute training prompt. The client never receives
-the expected translation until an incorrect result. Each entry's approved
-vocabulary answer remains the source of truth for ordinary card grading;
-dictionary verification remains limited to the configured allowlisted
-providers, with no arbitrary web scraping.
+before storing it as a 15-minute training prompt and rejects a reused sentence
+for the same learner/word. The client never receives the expected translation
+until an incorrect result. Exact checks use the server-held key first; only a
+miss then receives a strict, server-controlled semantic-equivalence pass so
+genuine full-sentence synonyms can be accepted. Dictionary verification
+remains limited to the configured allowlisted providers, with no arbitrary web
+scraping.
 
 ## Teams and Learn administration
 

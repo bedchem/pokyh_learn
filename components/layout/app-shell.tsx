@@ -116,6 +116,19 @@ export function AppShell({
   const { t } = useLearnPreferences();
   const identity = useCurrentIdentity(initialIdentity);
 
+  // The top-bar search advertises ⌘/Ctrl+K. Keep that promise globally while
+  // avoiding normal typing shortcuts and browser-reserved combinations.
+  useEffect(() => {
+    if (!identity) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.altKey || !(event.metaKey || event.ctrlKey) || event.key.toLocaleLowerCase('en-US') !== 'k') return;
+      event.preventDefault();
+      router.push('/catalog?focusSearch=1');
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [identity, router]);
+
   useEffect(() => {
     if (!workspaceMenuOpen) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -238,7 +251,7 @@ export function AppShell({
       <main className="main-content" id="main-content" aria-hidden={menuOpen || undefined} inert={menuOpen || undefined}>
         <div className="topbar">
           {identity && <>
-            <Link href="/catalog" className="search-trigger" aria-label={t('action.search')}><Search size={18} /><span>{t('action.search')}</span><kbd>{shortcutKeyLabel}</kbd></Link>
+            <Link href="/catalog?focusSearch=1" className="search-trigger" aria-label={t('action.search')}><Search size={18} /><span>{t('action.search')}</span><kbd>{shortcutKeyLabel}</kbd></Link>
             <div className="topbar__actions">
               <PreferenceControls compact />
               <QuickAddVocabularyButton variant="topbar" />

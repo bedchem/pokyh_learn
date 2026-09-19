@@ -316,8 +316,13 @@ Browser -> BFF catch-all (/api/learn/ai/*, unchanged proxy logic,
 - **Answer authority**: the model produces only a candidate sentence and
   translation in JSON (`think: false`). The server validates and keeps the
   expected translation private, then updates the adaptive review row through
-  an atomic one-time result claim. Free-form learner content never reaches
-  the model and ordinary vocabulary grading stays on the approved course key.
+  an atomic one-time result claim. It accepts the exact approved answer first;
+  a miss gets one strict, JSON-only semantic-equivalence evaluation so valid
+  complete-sentence synonyms can count, while the API retains the final score
+  and never exposes model reasoning. Sentence fingerprints prevent reuse for
+  the same learner/word. The learner answer is reference data, never an
+  instruction, and ordinary vocabulary grading stays on the approved course
+  key.
 - **Audit**: `learnAudit()` records only prompt identifiers, direction and
   correctness — never the sentence or learner answer.
 
