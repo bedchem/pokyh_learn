@@ -295,5 +295,12 @@ Ollama isn't currently bounded against beyond the Docker `mem_limit` itself.
 
 ## Release state
 
-Uncommitted — awaiting the user's confirmation of commit/push scope and Git
-identity per this repository's own protocol before any commit is created.
+Committed, not pushed, per the user's explicit confirmation of scope
+(commit both repos; don't push yet) and Git identity
+(`Plattnericus <felix.plattner312009@outlook.de>`, matching recent commits in
+both repos, confirmed rather than assumed):
+
+- `pokyh-backend`: `f4e1b1901b915ce9f41e300e3dd96fc9bdae2572` — "Add Phase 0
+  of the self-hosted AI assistant (\"KIbo\")".
+- `pokyh_learn-frontend`: `06afdb433c1ed6ffa29decc4e9af25e0cd4b0cc3` — "Add
+  Phase 0 frontend for the self-hosted AI assistant (\"KIbo\")".
