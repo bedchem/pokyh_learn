@@ -209,7 +209,64 @@ initially failing) was caught by testing the exact workflow the feature
 exists for, not left to the user to discover. Remaining gap: no interactive
 browser check of the new admin SPA panel (see Verification above).
 
-## Release state
+## Follow-up (same day) — real-world re-import failed on FLAGGED/untranslated words
+
+User exported the live "Englisch – Teamvokabular" team list (264 words) and
+immediately tried to re-import the unmodified file through the admin panel —
+the exact round-trip this feature exists for — and hit a 422. User's own
+words (verbatim, translated): "wanted to import this JSON into the backend,
+made a mistake/hit an error, make it perfect, one should know this stuff
+better."
+
+### Root cause
+
+`GET .../vocabulary/export` faithfully dumps every row a course actually has,
+including 7 learner-authored words with `verificationStatus: 'FLAGGED'` and an
+empty `targetText` (never translated). `adminLearnVocabularyImportEntrySchema`
+required `targetText` to be non-empty, so the whole 264-word file failed Zod
+validation before any row was processed — one bad row blocked 257 good ones,
+and the earlier same-day verification pass never caught it because its test
+data had no untranslated rows. Confirmed directly (not guessed) by extracting
+the exact schema into a throwaway script and running it against the user's
+real downloaded file (`node validate-import.mjs <file>`, deleted after use) —
+reproduced the precise 422, `vocabulary.115/116/129/130/131/145/185.targetText:
+String must contain at least 1 character(s)`, matching the file's 7 FLAGGED
+rows exactly.
+
+### Fix
+
+- `src/routes/admin.ts`: `adminLearnVocabularyImportEntrySchema.targetText`
+  no longer requires a minimum length (still capped at 500) — the schema
+  boundary accepts the row; it no longer decides completeness.
+- `src/services/learnVocabularyMerge.ts`: `mergeVocabularyEntries` now checks
+  `targetText.trim() === ''` first for each incoming row and reports a new
+  outcome, `skipped_missing_translation`, without ever adding it to `toCreate`
+  — a blank translation is still never persisted, the "always carry a
+  complete translation" rule now holds per-row at merge time instead of
+  failing the entire file at the schema boundary. New
+  `summary.skippedMissingTranslation` count.
+- `admin/src/types.ts` / `admin/src/components/VocabularyPanel.tsx`: surfaced
+  the new outcome — summary chip ("N ohne Übersetzung"), toast skip count, and
+  German label in the per-row review list — so the admin can see which words
+  were skipped and why instead of them silently vanishing from the import.
+
+### Verification
+
+- `npx tsc --noEmit` (backend) and `npx tsc -b --force` (admin SPA) both
+  clean after the change.
+- Re-extracted the (now fixed) schema into the same throwaway script and
+  re-ran it against the user's actual downloaded export file: all 264 rows
+  parse; confirmed exactly 7 have an empty `targetText` and are the same 7
+  rows the merge layer now routes to `skipped_missing_translation` rather
+  than persisting or rejecting the file.
+- Not re-run against a live Docker/MySQL stack in this follow-up (no stack
+  was up in this environment); the schema-level reproduction/fix is exact and
+  the merge-layer change is a straightforward new early-exit branch reusing
+  the existing `results`/`summary` plumbing already covered by the first
+  batch's transactional/idempotency verification above — flagging this gap
+  rather than claiming a full live re-run.
+
+### Release state
 
 Uncommitted — awaiting the user's confirmation of commit/push scope and Git
 identity per this repository's own protocol before any commit is created.
