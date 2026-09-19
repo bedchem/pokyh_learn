@@ -152,6 +152,52 @@ admin-panel's own `POST /api/admin/learn/teams`, not the learner-facing
   local dev database used across previous verification sessions for this
   feature area, and prior batches followed the same convention.
 
+## Follow-up (same day) — group team courses by team in the admin UI
+
+User follow-up (verbatim, translated, with a screenshot of the production
+`api.pokyh.com/admin/#/learn/courses` page showing the flat "Kurse (2)"
+list): the flat course list gets confusing once many teams exist — team
+courses should instead simply live under their own team, with the
+export/import from the first batch available there.
+
+### Changes
+
+- `src/routes/admin.ts`: `GET /learn/courses` gained an optional `teamId`
+  query filter (`adminLearnCourseListQuerySchema` + the route's `where`
+  builder) — lets the admin Teams page fetch one team's own courses
+  server-side instead of filtering a shared full list client-side.
+- `admin/src/api.ts`: `listLearnCourses` accepts `teamId`.
+- `admin/src/components/VocabularyPanel.tsx` (new): the word-list
+  browse/export/import panel from the first batch, extracted out of
+  `LearnCoursesPage.tsx` into a shared component (no behaviour change) so
+  both the flat Kurse page and the new per-team view use the exact same
+  code — it can never drift between the two entry points.
+- `admin/src/pages/LearnTeamsPage.tsx`: the existing "Kurszuordnung"
+  section (which only ever showed a bare count, by explicit prior design —
+  "content stays outside group management") is replaced with a real
+  `TeamCoursesPanel`: fetches that team's own courses via the new `teamId`
+  filter, and each course expands into the shared `VocabularyPanel`. The
+  flat Kurse page is left as-is (still useful for browsing/deleting any
+  course, team or not) — this is an addition, not a replacement.
+
+### Verification
+
+- `npx tsc --noEmit` (backend) and `tsc -b --force && vite build` (admin
+  SPA) both clean.
+- Rebuilt and redeployed the same local Docker/MySQL stack; confirmed via a
+  real request that `GET /api/admin/learn/courses?teamId=<id>` returns only
+  that team's 2 courses, and that a second test team's courses are not
+  included (no cross-team leakage) — checked both of this session's two
+  test teams against each other.
+- Re-ran the export → re-import no-op round-trip from the first batch
+  end-to-end after this refactor to confirm no regression: still `added: 0`
+  / all classified as exact duplicates.
+- Confirmed via the freshly built/served admin bundle that the new
+  team-scoped panel code and the `teamId` query param are present and
+  deployed.
+- Same known gap as the first batch: no interactive browser click-through
+  (Chrome extension not connected in this environment).
+
 ## Risk / next step
 
 Low-to-moderate: new route surface is admin-only (`requireAdmin`, the same
