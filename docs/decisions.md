@@ -333,3 +333,43 @@ notice explicit at next sign-in. It does not claim legal compliance. Before
 production activation, the controller/school must complete the documented
 review in [legal readiness](./legal-readiness.md), including actual data flows,
 hosting/subprocessors, retention and rights handling.
+
+## ADR-016 — Self-host the AI assistant, gate it per user, and never let it decide correctness
+
+**Status:** Phase 0 implemented (text chat, pilot grants, personalized
+context). File/image uploads, voice memos, a curated site knowledge base, and
+live web search are later, separately gated phases of the same feature.
+
+**Context:** The product wants a Pokyh-Learn-aware chat assistant ("KIbo"),
+reachable as a bottom-right popup, that can also ground answers in a user's
+own progress. Sending learner conversations or their own progress data to a
+third-party LLM API would be a new, unreviewed data-protection surface. The
+platform's existing "advisory only, never authoritative" rule for the
+MyMemory dictionary adapter is the closest precedent, but access here also
+needed to start as a controlled rollout rather than a platform-wide switch.
+
+**Decision:** Run the model entirely in a self-hosted, CPU-only Ollama
+container on the existing Dokploy host — no third-party AI API, no GPU
+dependency. Gate access with a per-user `LearnAiAccessGrant` pilot allowlist
+(an explicit administrator action, not a global `LearnAiConfig` boolean,
+which remains a separate, independent kill-switch). Assemble any personal
+context (due reviews, active-course progress, streak) fresh per request,
+scoped strictly to the requesting `stableUid`, never cached across users and
+never written into any shared/knowledge-base table. The assistant never
+grades a quiz, decides a correctness result, or authors course content — the
+platform's own curated answers remain the sole grading authority, matching
+ADR-006/ADR-007. Ollama's own context window (`num_ctx`) is deliberately
+capped by admin-configurable policy rather than left at the model's
+advertised maximum, since RAM for a CPU-quantized model grows sharply with
+context length — an unbounded default would silently violate the platform's
+resource-efficiency expectations on a shared, modestly sized host.
+
+**Consequences:** No learner conversation or personal-progress data ever
+leaves Pokyh-controlled infrastructure. A pilot can be widened gradually by
+granting more accounts without a redeploy. A host with insufficient RAM/CPU
+degrades to a clear "assistant is still starting up" or "currently disabled"
+response rather than starving the rest of Pokyh Learn, because the model
+container is not a hard dependency of the main application. Every later
+phase (uploads, voice, knowledge base, live web search) must independently
+justify its own resource cost and threat model before it ships, rather than
+inheriting blanket trust from this decision.

@@ -23,10 +23,11 @@ import { BrandMark } from '@/components/ui/brand-mark';
 import { Avatar } from '@/components/ui/avatar';
 import { PreferenceControls } from '@/components/layout/preference-controls';
 import { QuickAddVocabularyButton } from '@/components/learn/vocabulary-quick-add';
+import { AiAssistantWidget } from '@/components/learn/ai-assistant';
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
 import { learnApi, logout } from '@/lib/client/api';
 
-export type CurrentIdentity = { username: string; isAdmin: boolean };
+export type CurrentIdentity = { username: string; isAdmin: boolean; canUseAiAssistant: boolean };
 
 // Fetched once client-side so every AppShell-wrapped page gets a real avatar
 // and role-safe navigation without threading identity props through ~20 server
@@ -36,8 +37,8 @@ function useCurrentIdentity(initialIdentity?: CurrentIdentity | null): CurrentId
   useEffect(() => {
     if (initialIdentity) return;
     let cancelled = false;
-    learnApi<{ user: { username: string }; isAdmin: boolean }>('me')
-      .then((data) => { if (!cancelled) setIdentity({ username: data.user.username, isAdmin: data.isAdmin }); })
+    learnApi<{ user: { username: string }; isAdmin: boolean; canUseAiAssistant?: boolean }>('me')
+      .then((data) => { if (!cancelled) setIdentity({ username: data.user.username, isAdmin: data.isAdmin, canUseAiAssistant: Boolean(data.canUseAiAssistant) }); })
       .catch(() => { /* not signed in, or offline — fallback avatar stays */ });
     return () => { cancelled = true; };
   }, [initialIdentity]);
@@ -256,6 +257,8 @@ export function AppShell({
           return <Link className={current ? 'is-current' : ''} href={href} key={href}><Icon size={19} /><span>{t(labelKey)}</span></Link>;
         })}
       </nav>}
+
+      {identity?.canUseAiAssistant && <AiAssistantWidget />}
     </div>
   );
 }

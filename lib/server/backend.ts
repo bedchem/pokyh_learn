@@ -16,13 +16,16 @@ interface BackendRequest extends RequestInit {
   token?: string | null;
   cache?: RequestCache;
   next?: { revalidate?: number; tags?: string[] };
+  // Overrides config.timeoutMs for calls known to legitimately take longer
+  // than a normal API round-trip (e.g. a self-hosted, CPU-only AI response).
+  timeoutMs?: number;
 }
 
 export async function backendFetch<T>(path: string, init: BackendRequest = {}): Promise<T> {
-  const { token, headers: initHeaders, next, cache, ...requestInit } = init;
+  const { token, headers: initHeaders, next, cache, timeoutMs, ...requestInit } = init;
   const config = getServerConfig();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs ?? config.timeoutMs);
 
   try {
     const response = await fetch(`${config.backendUrl}${path}`, {

@@ -84,10 +84,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const bodyLimit = path.join('/') === 'library/import' ? config.bffImportBodyLimitBytes : config.bffBodyLimitBytes;
     const body = method === 'GET' || method === 'HEAD' ? undefined : (await readValidatedJsonBody(request, bodyLimit)).raw;
     const key = idempotencyHeader(request);
+    // A self-hosted, CPU-only assistant reply can legitimately take much
+    // longer than a normal Learn API call.
+    const timeoutMs = path[0] === 'ai' ? config.aiTimeoutMs : undefined;
     const requestBackend = (accessToken: string | null) => backendFetch<unknown>(endpoint, {
       method,
       token: accessToken,
       cache: 'no-store',
+      timeoutMs,
       headers: {
         ...(body ? { 'Content-Type': 'application/json' } : {}),
         ...(key ? { 'Idempotency-Key': key } : {}),

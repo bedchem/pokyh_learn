@@ -142,6 +142,37 @@ The exported `profile` may include `locale` and `theme` alongside daily goal
 and timezone. Importing these values remains bounded to the caller's own
 profile; no role, access or legal-notice state can be imported.
 
+## AI assistant ("KIbo")
+
+Self-hosted, CPU-only Ollama-backed assistant. Disabled by default
+(`LEARN_AI_ENABLED=false`) and, even when enabled, gated per user by a
+`LearnAiAccessGrant` pilot allowlist — there is no global on/off switch for
+end users. `GET /me` includes a `canUseAiAssistant` hint (grant present AND
+the admin kill-switch on); it is a capability hint only, never enforcement.
+
+| Method | Path | Required access | Behavior |
+| --- | --- | --- | --- |
+| `GET` | `/ai/access` | Authenticated | Reports whether this account currently has assistant access, whether the model has finished its startup pull, and the current per-hour message limit. |
+| `GET` | `/ai/conversations` | Pilot grant | Lists the caller's own conversations, most recent first. |
+| `POST` | `/ai/conversations` | Pilot grant | Starts a new conversation. |
+| `GET` | `/ai/conversations/:id` | Pilot grant + ownership | Returns that conversation's messages. |
+| `DELETE` | `/ai/conversations/:id` | Pilot grant + ownership | Permanently deletes a conversation. |
+| `POST` | `/ai/conversations/:id/messages` | Pilot grant + ownership | Sends a message; grades nothing itself, returns the assistant's reply. Accepts an `idempotencyKey` — a retry with the same key returns the original exchange rather than calling the model (and counting against quota) again. |
+
+The assistant never grades a quiz, decides correctness, or writes to any
+other Learn record — it is purely conversational. Personal context (due
+review count, active-course progress, streak) may be included in its prompt
+per request, assembled fresh and scoped strictly to the calling `stableUid`;
+it is never cached across users and never stored in any shared/knowledge-base
+table. Conversations and messages are durable in MySQL (`LearnAiConversation`,
+`LearnAiMessage`); message content is never written to the audit log, only
+outcome metadata (mode, token counts, which tools ran).
+
+Not yet mounted (tracked as later phases of the same feature): file/image
+uploads, voice-memo transcription, an admin-curated site knowledge base, and
+a live multi-source web-search tool. Each is additive and independently
+gated by its own `LearnAiConfig` flag when it ships.
+
 ## Teams and Learn administration
 
 `GET /teams` remains a membership-only learner read: a learner can see only
@@ -180,7 +211,13 @@ Learn management data. Approval references and secrets are never returned.
 - platform-wide Learn backup/restore and audit-feed UI;
 - Redis uses beyond the optional private course-specific analytics response
   cache, including queues and distributed idempotency storage;
-- automatic content generation, live AI grading, or a writing-feedback provider.
+- automatic content generation, live AI grading, or a writing-feedback
+  provider — still true even with the AI assistant above mounted: it is
+  conversational only and never decides a quiz outcome or authors course
+  content;
+- AI assistant file/image uploads, voice memos, a curated site knowledge
+  base, and live web search (see "AI assistant" above — each is a later,
+  separately gated phase of that same feature, not mounted yet).
 
 MySQL is the durable authority. Any future cache or provider must be a
 recoverable optimization that cannot lose or silently alter progress,

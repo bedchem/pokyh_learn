@@ -385,14 +385,14 @@ export async function getCourseOptions(token?: string | null): Promise<Course[]>
   return getMyCourses(token);
 }
 
-export async function getLearnIdentity(token?: string | null): Promise<{ username: string; isAdmin: boolean } | null> {
+export async function getLearnIdentity(token?: string | null): Promise<{ username: string; isAdmin: boolean; canUseAiAssistant: boolean } | null> {
   if (!token) return null;
-  if (isDemoMode()) return { username: 'Demo', isAdmin: true };
-  const payload = await backendFetch<{ user: { username: string }; isAdmin: boolean }>(pathFor('/me'), {
+  if (isDemoMode()) return { username: 'Demo', isAdmin: true, canUseAiAssistant: false };
+  const payload = await backendFetch<{ user: { username: string }; isAdmin: boolean; canUseAiAssistant?: boolean }>(pathFor('/me'), {
     token,
     cache: 'no-store',
   });
-  return { username: payload.user.username, isAdmin: payload.isAdmin };
+  return { username: payload.user.username, isAdmin: payload.isAdmin, canUseAiAssistant: Boolean(payload.canUseAiAssistant) };
 }
 
 export async function getLearnerSettings(token?: string | null): Promise<{

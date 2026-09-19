@@ -237,6 +237,11 @@ GET   /learn/teams
 POST  /learn/teams
 GET   /learn/admin/overview
 POST  /learn/admin/course-access
+GET   /learn/ai/access
+GET   /learn/ai/conversations
+POST  /learn/ai/conversations
+GET   /learn/ai/conversations/:id
+POST  /learn/ai/conversations/:id/messages
 ```
 
 Every endpoint other than published catalogue reads requires the normal API-key
@@ -505,6 +510,7 @@ or production cookie.
 | `LEARN_API_TIMEOUT_MS` | server only | BFF backend deadline |
 | `LEARN_BFF_BODY_LIMIT_BYTES` | server only | bounded ordinary JSON body size accepted by the BFF |
 | `LEARN_BFF_IMPORT_BODY_LIMIT_BYTES` | server only | separately bounded library-import JSON body size accepted by the BFF |
+| `LEARN_AI_API_TIMEOUT_MS` | server only | longer BFF deadline for `/api/learn/ai/*`, since a self-hosted CPU-only assistant reply can take longer than a normal call |
 | `NEXT_PUBLIC_LEARN_DEMO_MODE` | local development only | enables static visual demo data |
 
 The production backend additionally configures at least:
@@ -515,6 +521,9 @@ The production backend additionally configures at least:
 - `LEARN_DICTIONARY_ENABLED`, provider URL/contact, allowed language pairs,
   timeout and bounded cache policy;
 - `LEARN_IMPORT_MAX_*` item limits;
+- `LEARN_AI_ENABLED`, model name, context-window cap, per-hour rate limit,
+  and the internal-only Ollama base URL — pilot access is a separate
+  per-user grant, never this flag alone (see `docs/decisions.md` ADR-016);
 - Redis only after a dedicated deployment review;
 - admin-configured catalogue policy, public publishing policy, authoring
   limits, moderation rules, and retention policy.
