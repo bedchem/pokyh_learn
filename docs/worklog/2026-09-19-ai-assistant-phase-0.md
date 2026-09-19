@@ -369,6 +369,56 @@ so a future reader isn't caught by the same silent no-op.
   cpus) since restarting them isn't needed to validate the fix itself, which
   is entirely about what `docker compose config` resolves.
 
+## Follow-up (same day) — drop the Compose profile so `docker compose up` alone starts everything
+
+User: "start everything with just the docker-compose.yml file!!!". The
+`ollama` service required `--profile ai` (or `COMPOSE_PROFILES=ai`) to start,
+which is a real obstacle for Dokploy-style deployment: per
+`docs/worklog/2026-09-16-dokploy-runtime-env.md`, Dokploy deploys straight
+from `docker-compose.yml` with an operator-supplied `.env`, not through
+`scripts/compose-stack.sh` — there is no obvious place to pass a profile
+flag. Removed `profiles: ["ai"]` from the `ollama` service so a plain
+`docker compose up -d` starts `mysql`/`redis`/`app`/`ollama` together,
+matching the original "always auto-starts" requirement. `app` still does not
+hard-`depends_on` `ollama` — every non-AI route keeps working regardless of
+Ollama's state, and the feature stays functionally dormant until an operator
+sets `LEARN_AI_ENABLED=true` (the model is only pulled once that flag is on).
+
+While investigating the safest way to do this, verified precisely (not
+assumed) what `COMPOSE_DISABLE_ENV_FILE` in `compose-stack.sh` actually
+protects against, since dropping profile-gating meant re-examining whether
+Dokploy's plain-Compose deployment path is safe for the secrets in `app`'s
+`env_file`. Built a throwaway test compose project with a bcrypt-hash-shaped
+`$`-containing value: confirmed `env_file: ... format: raw` (already used for
+`app`) reliably protects a secret from Compose's variable interpolation
+*regardless* of `COMPOSE_DISABLE_ENV_FILE` — the same test *without*
+`format: raw` reproducibly corrupted the value (`$2b$12$abc...` truncated to
+`$2b$12`, with a "variable not set" warning) in both states. This means
+`COMPOSE_DISABLE_ENV_FILE`'s real purpose is narrower than assumed: it
+governs the project `.env` file Compose auto-loads for top-level `${VAR}`
+substitution (`OLLAMA_MEM_LIMIT` and friends), not the `env_file` secrets
+path, which was already safe on its own. No secret in this file is ever
+referenced via top-level `${...}` substitution, so plain `docker compose up`
+(no wrapper script, Compose's default `.env` auto-load active) is safe for
+this file's actual structure.
+
+### Verification
+
+- `docker compose config` (plain, no wrapper script, `COMPOSE_DISABLE_ENV_FILE`
+  unset — the Dokploy-realistic path) with `OLLAMA_MEM_LIMIT=6g`/
+  `OLLAMA_CPUS=2` set in a real `.env` next to the compose file → resolved
+  `ollama` present without any profile flag, `cpus: 2`, `mem_limit:
+  "6442450944"` (6GB) — confirms both the profile removal and the sizing
+  knobs work through the actual deployment path this repo uses in production,
+  not just the local wrapper script.
+- `./scripts/compose-stack.sh up -d` (no `--profile ai`) on the live local
+  stack → `ollama` and `app` both recreated and healthy, `"Database ready
+  (schema applied, connected)"`, no model re-pull triggered (confirms the
+  named `ollama_data` volume correctly persisted the already-pulled
+  `gemma4:e4b` across the recreate).
+- Test `.env` values and the throwaway compose test project were removed
+  after verification.
+
 ## Release state
 
 Committed, not pushed, per the user's explicit confirmation of scope
@@ -380,7 +430,8 @@ both repos, confirmed rather than assumed):
   of the self-hosted AI assistant (\"KIbo\")"; `84bb5bcae0129708fa60caf08c35f2737e9268ea`
   — "Add team-level AI assistant access grants"; `6c548725e22e6d40fbefab64f015d6ef119da7f0`
   — "Fix Ollama resource/tuning vars being silently ignored by the deploy
-  script".
+  script"; `5573c0e253fbaaec83ce37313915f03ffdb3d3d3` — "Start the AI
+  assistant automatically with a plain docker compose up".
 - `pokyh_learn-frontend`: `06afdb433c1ed6ffa29decc4e9af25e0cd4b0cc3` — "Add
   Phase 0 frontend for the self-hosted AI assistant (\"KIbo\")";
   `c0b7d9848edae98ac0bc5c24234fedd66119a3b1` — "Record Phase 0 AI assistant
