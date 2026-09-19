@@ -159,7 +159,7 @@ kill-switch on); it is a capability hint only, never enforcement.
 | `POST` | `/ai/conversations` | Pilot grant | Starts a new conversation. |
 | `GET` | `/ai/conversations/:id` | Pilot grant + ownership | Returns that conversation's messages. |
 | `DELETE` | `/ai/conversations/:id` | Pilot grant + ownership | Permanently deletes a conversation. |
-| `POST` | `/ai/conversations/:id/messages` | Pilot grant + ownership | Sends a message; grades nothing itself, returns the assistant's reply. Accepts an `idempotencyKey` — a retry with the same key returns the original exchange rather than calling the model (and counting against quota) again. |
+| `POST` | `/ai/conversations/:id/messages` | Pilot grant + ownership | Sends a message; grades nothing itself, returns the assistant's reply. Accepts an `idempotencyKey` — a retry with the same key returns the original exchange rather than calling the model (and counting against quota) again. Optionally accepts up to 3 `attachments` (`{ filename, dataBase64 }` — images and short plain-text files only) and a `pageContext` (`{ path, title }`, the current route/page title only, never raw screen content). |
 
 The assistant never grades a quiz, decides correctness, or writes to any
 other Learn record — it is purely conversational. Personal context (due
@@ -168,12 +168,28 @@ per request, assembled fresh and scoped strictly to the calling `stableUid`;
 it is never cached across users and never stored in any shared/knowledge-base
 table. Conversations and messages are durable in MySQL (`LearnAiConversation`,
 `LearnAiMessage`); message content is never written to the audit log, only
-outcome metadata (mode, token counts, which tools ran).
+outcome metadata (mode, token counts, which tools ran, attachment count).
 
-Not yet mounted (tracked as later phases of the same feature): file/image
-uploads, voice-memo transcription, an admin-curated site knowledge base, and
-a live multi-source web-search tool. Each is additive and independently
-gated by its own `LearnAiConfig` flag when it ships.
+**Attachments** (`LearnAiAttachment`, disabled by default via
+`LearnAiConfig.uploadsEnabled`): the claimed filename/MIME type is never
+trusted — the real kind is derived from the file's actual bytes (magic-byte
+signatures for images; a content-sniff rejecting anything that looks like
+binary data for text) before it is stored or sent to the model. Images go to
+Ollama's native vision input; short text files are inlined into the prompt,
+clearly delimited as reference material, never as an instruction. Content
+lives directly in MySQL, bounded by `LearnAiConfig.uploadMaxBytes` (default
+4MB, admin-configurable up to 20MB) — no separate object storage.
+
+**Page context**: the assistant can be told which Pokyh Learn page/route the
+learner is currently on so it can help explain it — deliberately limited to
+a route path and page title, never raw DOM/screen content (which could leak
+another learner's visible data or become a much larger prompt-injection
+surface). Also treated as untrusted reference material by the model.
+
+Not yet mounted (tracked as later phases of the same feature): PDF/DOCX
+attachment parsing, an admin-curated site knowledge base, and a live
+multi-source web-search tool. Each is additive and independently gated by
+its own `LearnAiConfig` flag when it ships.
 
 ## Teams and Learn administration
 

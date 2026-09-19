@@ -645,10 +645,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 @keyframes ai-typing-pulse { 0%, 60%, 100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
 .ai-assistant-error { color: #a44261; font-size: 12px; }
+.ai-message__attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ai-message__attachment-image { max-width: 220px; max-height: 160px; border-radius: 10px; display: block; object-fit: cover; }
+.ai-message__attachment-file { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); font-size: 11px; }
+.ai-assistant-pending-attachments { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px 0; }
+.ai-assistant-pending-attachment { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 11px; max-width: 160px; }
+.ai-assistant-pending-attachment img { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.ai-assistant-pending-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-assistant-pending-attachment button { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 999px; flex-shrink: 0; color: #a44261; background: color-mix(in srgb, #a44261 12%, transparent); }
 .ai-assistant-composer { display: flex; align-items: flex-end; gap: 8px; padding: 14px 16px; border-top: 1px solid var(--line); }
 .ai-assistant-composer textarea { flex: 1; resize: none; max-height: 160px; min-height: 42px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font: inherit; line-height: 1.4; }
 .ai-assistant-composer button { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.ai-assistant-mic { color: var(--ink); }
+.ai-assistant-mic, .ai-assistant-attach { color: var(--ink); }
 .ai-assistant-mic--active { color: var(--control-text); background: var(--control-bg); }
 .ai-assistant-messages .spin, .ai-assistant-composer .spin { animation: spin 0.8s linear infinite; }
 

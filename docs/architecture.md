@@ -325,8 +325,20 @@ Browser -> BFF catch-all (/api/learn/ai/*, unchanged proxy logic,
   `LearnQuizAttempt`'s pattern.
 - **Audit**: `learnAudit()` records that a message was sent, its mode, and
   token counts — never the message content itself.
-- **Not yet mounted**: file/image uploads, voice-memo transcription (planned
-  as a local, self-hosted Whisper step rather than depending on Ollama's own
+- **Uploads and page context**: file/image attachments (`LearnAiAttachment`,
+  `LearnAiConfig.uploadsEnabled`, off by default) are validated by the file's
+  actual bytes, never the client's claimed type — magic-byte signatures for
+  images, a binary-content-sniff rejection for anything claiming to be text.
+  Images use Ollama's native vision input; text is inlined as bounded,
+  delimited reference context. Content lives directly in MySQL, bounded by
+  `uploadMaxBytes` (default 4MB). Page context (`{ path, title }` only, never
+  raw DOM/screen content) lets the assistant help explain the page the
+  learner is currently on, also treated as untrusted reference material.
+  `/learn/ai` has its own larger Express body-size limit (`BODY_LIMIT_AI`)
+  ahead of the general default, since attachments travel as base64 JSON.
+- **Not yet mounted**: PDF/DOCX attachment parsing (needs a new, separately
+  reviewed parsing dependency), voice-memo transcription (planned as a
+  local, self-hosted Whisper step rather than depending on Ollama's own
   audio-input maturity), an admin-curated site knowledge base, and a live
   multi-source web-search tool. Each ships as its own phase with its own
   `LearnAiConfig` flag and its own threat-model review before release.

@@ -1,15 +1,26 @@
 'use client';
 
-import { Loader2, Mic, MessageCircle, Menu, Plus, Send, Trash2, X } from 'lucide-react';
+import { FileText, Loader2, Mic, MessageCircle, Menu, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 
 import { learnApi } from '@/lib/client/api';
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
 
+interface AiAttachment {
+  id: string;
+  kind: string;
+  mimeType: string;
+  filename: string;
+  byteSize: number;
+  content: string;
+}
+
 interface AiMessage {
   id: string;
   role: string;
   content: string;
+  attachments?: AiAttachment[];
 }
 
 interface ConversationSummary {
@@ -18,6 +29,19 @@ interface ConversationSummary {
   lastMessageAt: string | null;
   createdAt: string;
 }
+
+interface PendingAttachment {
+  filename: string;
+  dataBase64: string;
+  isImage: boolean;
+  previewUrl?: string;
+}
+
+const MAX_ATTACHMENTS = 3;
+// Soft client-side guard only, purely for fast feedback — the backend's
+// admin-configured LearnAiConfig.uploadMaxBytes is the real, authoritative
+// limit and is re-checked against the file's actual decoded bytes there.
+const CLIENT_SOFT_MAX_BYTES = 8 * 1024 * 1024;
 
 // Minimal shape of the browser's (non-standard, Chromium/Safari-only) Web
 // Speech API — not in TypeScript's DOM lib, and not worth a new dependency
@@ -41,6 +65,20 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 
 const speechLangByLocale: Record<string, string> = { de: 'de-DE', en: 'en-US', it: 'it-IT' };
 
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      // Strip the "data:<mime>;base64," prefix — the backend wants raw base64.
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex === -1 ? result : result.slice(commaIndex + 1));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 // The bottom-right "KIbo" assistant. A small always-visible launcher opens a
 // large, claude.ai-inspired panel: a conversation sidebar on the left, the
 // active thread + composer on the right. Rendered only when the caller has
@@ -52,6 +90,7 @@ const speechLangByLocale: Record<string, string> = { de: 'de-DE', en: 'en-US', i
 // rather than a new dialog/modal dependency.
 export function AiAssistantWidget() {
   const { t, locale } = useLearnPreferences();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -64,11 +103,15 @@ export function AiAssistantWidget() {
   const [error, setError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  const [uploadsEnabled, setUploadsEnabled] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingKeyRef = useRef<string | null>(null);
   const loadedRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -79,7 +122,11 @@ export function AiAssistantWidget() {
     setLoadingList(true);
     setError(null);
     try {
-      const data = await learnApi<{ conversations: ConversationSummary[] }>('ai/conversations');
+      const [access, data] = await Promise.all([
+        learnApi<{ uploadsEnabled: boolean }>('ai/access').catch(() => ({ uploadsEnabled: false })),
+        learnApi<{ conversations: ConversationSummary[] }>('ai/conversations'),
+      ]);
+      setUploadsEnabled(access.uploadsEnabled);
       setConversations(data.conversations);
       if (selectLatest && data.conversations[0]) {
         await selectConversation(data.conversations[0].id);
@@ -137,27 +184,67 @@ export function AiAssistantWidget() {
     return created.conversation.id;
   }
 
+  async function handleFileSelect(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    setAttachError(null);
+    const files = Array.from(fileList).slice(0, MAX_ATTACHMENTS - pendingAttachments.length);
+    if (files.length < fileList.length) {
+      setAttachError(t('ai.tooManyAttachments'));
+    }
+    for (const file of files) {
+      if (file.size > CLIENT_SOFT_MAX_BYTES) {
+        setAttachError(t('ai.attachmentTooLarge'));
+        continue;
+      }
+      try {
+        const dataBase64 = await readFileAsBase64(file);
+        const isImage = file.type.startsWith('image/');
+        setPendingAttachments((current) => [
+          ...current,
+          { filename: file.name, dataBase64, isImage, previewUrl: isImage ? URL.createObjectURL(file) : undefined },
+        ]);
+      } catch {
+        setAttachError(t('ai.attachmentReadFailed'));
+      }
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setPendingAttachments((current) => {
+      const target = current[index];
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return current.filter((_, i) => i !== index);
+    });
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const content = input.trim();
-    if (!content || sending) return;
+    if ((!content && pendingAttachments.length === 0) || sending) return;
 
     if (!pendingKeyRef.current) {
       pendingKeyRef.current = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
     }
     const idempotencyKey = pendingKeyRef.current;
+    const attachmentsToSend = pendingAttachments;
 
     setSending(true);
     setError(null);
     const optimisticId = `pending-${idempotencyKey}`;
     setMessages((current) => [...current, { id: optimisticId, role: 'user', content }]);
     setInput('');
+    setPendingAttachments([]);
 
     try {
       const id = await ensureConversation();
       const result = await learnApi<{ userMessage: AiMessage; assistantMessage: AiMessage }>(`ai/conversations/${id}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content, idempotencyKey }),
+        body: JSON.stringify({
+          content,
+          idempotencyKey,
+          attachments: attachmentsToSend.map((a) => ({ filename: a.filename, dataBase64: a.dataBase64 })),
+          pageContext: { path: pathname ?? '', title: typeof document !== 'undefined' ? document.title : '' },
+        }),
       });
       setMessages((current) => [
         ...current.filter((message) => message.id !== optimisticId),
@@ -169,6 +256,7 @@ export function AiAssistantWidget() {
     } catch (err) {
       setMessages((current) => current.filter((message) => message.id !== optimisticId));
       setInput(content);
+      setPendingAttachments(attachmentsToSend);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
@@ -339,7 +427,26 @@ export function AiAssistantWidget() {
                 {messages.map((message) => (
                   <div key={message.id} className={message.role === 'assistant' ? 'ai-message ai-message--assistant' : 'ai-message ai-message--user'}>
                     <span className="ai-message__role">{message.role === 'assistant' ? t('ai.assistantName') : t('ai.you')}</span>
-                    <p>{message.content}</p>
+                    {message.content && <p>{message.content}</p>}
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="ai-message__attachments">
+                        {message.attachments.map((attachment) =>
+                          attachment.kind === 'image' ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- base64 chat attachment, not a static asset
+                            <img
+                              key={attachment.id}
+                              className="ai-message__attachment-image"
+                              src={`data:${attachment.mimeType};base64,${attachment.content}`}
+                              alt={attachment.filename}
+                            />
+                          ) : (
+                            <span key={attachment.id} className="ai-message__attachment-file">
+                              <FileText size={13} /> {attachment.filename}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {sending && (
@@ -351,7 +458,44 @@ export function AiAssistantWidget() {
                 {error && <p className="ai-assistant-error" role="alert">{error}</p>}
               </div>
 
+              {(pendingAttachments.length > 0 || attachError) && (
+                <div className="ai-assistant-pending-attachments">
+                  {pendingAttachments.map((attachment, index) => (
+                    <span key={`${attachment.filename}-${index}`} className="ai-assistant-pending-attachment">
+                      {attachment.previewUrl
+                        // eslint-disable-next-line @next/next/no-img-element -- local object URL preview, not a static asset
+                        ? <img src={attachment.previewUrl} alt={attachment.filename} />
+                        : <FileText size={13} />}
+                      <span>{attachment.filename}</span>
+                      <button type="button" onClick={() => removeAttachment(index)} aria-label={t('ai.removeAttachment')}><X size={12} /></button>
+                    </span>
+                  ))}
+                  {attachError && <span className="ai-assistant-error">{attachError}</span>}
+                </div>
+              )}
+
               <form className="ai-assistant-composer" onSubmit={(event) => void handleSubmit(event)}>
+                {uploadsEnabled && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif,text/plain,.txt"
+                      multiple
+                      hidden
+                      onChange={(event) => { void handleFileSelect(event.target.files); event.target.value = ''; }}
+                    />
+                    <button
+                      type="button"
+                      className="icon-button ai-assistant-attach"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={sending || pendingAttachments.length >= MAX_ATTACHMENTS}
+                      aria-label={t('ai.attachFile')}
+                    >
+                      <Paperclip size={16} />
+                    </button>
+                  </>
+                )}
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -373,7 +517,7 @@ export function AiAssistantWidget() {
                     <Mic size={16} />
                   </button>
                 )}
-                <button type="submit" className="button button--dark button--small" disabled={sending || !input.trim()}>
+                <button type="submit" className="button button--dark button--small" disabled={sending || (!input.trim() && pendingAttachments.length === 0)}>
                   {sending ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
                   {sending ? t('ai.sending') : t('ai.send')}
                 </button>

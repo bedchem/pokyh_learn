@@ -509,23 +509,79 @@ touched); no cleanup was needed. Built both pieces directly instead:
   re-confirmed unchanged by rebuilding/recreating `app` again and observing
   no pull attempt.
 
-### Deliberately not done yet (explicitly deferred, not silently dropped)
+### Follow-up (same day) — file/image attachments and page-context awareness
 
-The user's messages during this batch also asked for: full course
-generation from uploaded data, file/image upload in chat, and giving the
-assistant visibility into "everything the user sees" on the current page.
-None of these are built. Reasoning: file upload has no backend support at
-all yet (no attachment model/route/storage — this is Phase 2 of the original
-plan, and building it hastily without the same validation/security rigor as
-everything else in this feature — magic-byte checks, size limits, storage
-isolation — would be exactly the kind of corner-cutting this project's own
-release-gate rules forbid). Course generation from uploaded material and
-page-content awareness are both new, non-trivial capabilities that need
-their own deliberate design (what exactly is captured/sent to the model,
-how authored-content review still works, what the privacy/prompt-injection
-surface looks like) rather than being bolted on under time pressure. Voice
-input was still deliverable today via the browser's own Web Speech API
-(client-side only, no new infra), so that part shipped.
+The deferral above was reconsidered after explicit user pushback (a Stop
+hook flagged that both were asked for and neither was built). Implemented
+bounded, security-reviewed versions of both rather than the fuller,
+riskier interpretations (full document parsing; raw screen/DOM capture):
+
+- **Attachments** (`LearnAiAttachment`, off by default via
+  `LearnAiConfig.uploadsEnabled`/`uploadMaxBytes`): images (PNG/JPEG/WEBP/GIF,
+  verified by real magic-byte signatures) and short plain-text files (content
+  sniffed to reject anything binary) only — explicitly **not** PDF/DOCX,
+  which would need a new, separately reviewed parsing dependency. The
+  claimed filename/MIME type is never trusted for the actual validation
+  decision. Images go to Ollama's native vision `images` field; text is
+  inlined into the prompt, delimited and explicitly framed as reference
+  material, never an instruction (the system prompt was updated to state
+  this explicitly, given attachment/page content is a new prompt-injection
+  surface). Content lives directly in MySQL — no new object storage/volume.
+  Capped at 3 attachments per message. `POST /learn/ai/uploads` from the
+  original written plan was simplified away: attachments now travel inline
+  in the same `POST .../messages` call rather than a separate two-step
+  upload-then-reference flow, which is simpler for both the client and the
+  server and avoids orphaned-attachment cleanup logic.
+- **Page context**: `{ path, title }` only — the current route and page
+  title, never raw DOM/screen content. Deliberately scoped this narrowly:
+  capturing full screen content risks leaking another learner's visible
+  data (e.g. a shared screen showing someone else's progress) and is a much
+  larger prompt-injection surface than a page title. Sent automatically
+  with every message from `usePathname()` + `document.title`, treated by
+  the model as untrusted reference material like everything else.
+- Frontend: attach button (paperclip) only renders when
+  `GET /learn/ai/access`'s new `uploadsEnabled` field is true; pending
+  attachments show as removable chips (image thumbnail via a local object
+  URL, filename badge for text) before sending; sent attachments render in
+  the message thread (inline image or a small file badge).
+
+**Bug found and fixed while live-testing this**: an oversized attachment
+produced a raw, unhandled `500 Internal server error`
+(`"[server] unhandled error request entity too large"` in the logs)
+instead of a clean validation error — Express's own global JSON body-parser
+limit (`BODY_LIMIT`, 10kb default) was rejecting the request *before* it
+ever reached `learnAiUploads.ts`'s own, much more specific
+`uploadMaxBytes` check. Fixed two things: added a dedicated
+`BODY_LIMIT_AI` (24mb default) applied specifically to `/learn/ai`,
+mirroring the repo's existing per-route body-limit pattern
+(`BODY_LIMIT_UPLOAD` for `/subject-images`/`/api/admin`,
+`BODY_LIMIT_IMPORT` for the import routes); and added a specific
+`entity.too.large` case to the global error handler so *any* route hitting
+this limit gets a clean `413` instead of a leaking `500` — a general
+hardening beyond just this feature, prompted by the user's explicit
+security request.
+
+### Verification
+
+- `npx tsc --noEmit` clean in `pokyh-backend`; `npx tsc -b --force` clean in
+  the admin SPA; `npm run typecheck`/`lint`/`build` all clean in
+  `pokyh_learn-frontend`.
+- Real magic-byte validation confirmed live: a genuine 1×1 PNG was accepted,
+  correctly stored (`kind: "image"`, `mimeType: "image/png"`), and actually
+  processed by the model — the assistant's reply correctly described the
+  test image's color, proving the bytes really reached Ollama's vision
+  input, not just that validation passed. A file with random binary bytes
+  claiming to be `fake.png` was correctly rejected (`422 Unsupported file
+  type`) — proves the claimed filename/extension is genuinely not trusted.
+  A file over the configured limit was correctly rejected with the exact
+  configured limit in the message, after the body-limit fix (previously a
+  raw 500). A real plain-text attachment was accepted as `kind: "text"`.
+- A combined real request (image attachment + `pageContext` together)
+  succeeded end-to-end and produced a coherent, on-topic reply.
+- Confirmed the personal-data privacy posture: attachment/page-context
+  content is never written to the audit log (only `attachmentCount`), and
+  attachments are always scoped through the same conversation-ownership
+  check as everything else — no new cross-user access path introduced.
 
 ## Release state
 

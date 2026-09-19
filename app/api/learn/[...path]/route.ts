@@ -81,7 +81,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
     const search = request.nextUrl.search;
     const endpoint = safePath(config.apiPrefix, path, search);
-    const bodyLimit = path.join('/') === 'library/import' ? config.bffImportBodyLimitBytes : config.bffBodyLimitBytes;
+    const bodyLimit = path.join('/') === 'library/import'
+      ? config.bffImportBodyLimitBytes
+      : path[0] === 'ai' ? config.bffAiBodyLimitBytes : config.bffBodyLimitBytes;
     const body = method === 'GET' || method === 'HEAD' ? undefined : (await readValidatedJsonBody(request, bodyLimit)).raw;
     const key = idempotencyHeader(request);
     // A self-hosted, CPU-only assistant reply can legitimately take much

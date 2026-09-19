@@ -340,6 +340,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.closeSidebar': 'Unterhaltungen ausblenden',
     'ai.startDictation': 'Diktat starten',
     'ai.stopDictation': 'Diktat stoppen',
+    'ai.attachFile': 'Datei anhängen',
+    'ai.removeAttachment': 'Anhang entfernen',
+    'ai.tooManyAttachments': 'Maximal 3 Anhänge pro Nachricht.',
+    'ai.attachmentTooLarge': 'Datei ist zu groß.',
+    'ai.attachmentReadFailed': 'Datei konnte nicht gelesen werden.',
   },
   en: {
     'nav.dashboard': 'Overview',
@@ -663,6 +668,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.closeSidebar': 'Hide conversations',
     'ai.startDictation': 'Start dictation',
     'ai.stopDictation': 'Stop dictation',
+    'ai.attachFile': 'Attach file',
+    'ai.removeAttachment': 'Remove attachment',
+    'ai.tooManyAttachments': 'Up to 3 attachments per message.',
+    'ai.attachmentTooLarge': 'File is too large.',
+    'ai.attachmentReadFailed': 'Could not read the file.',
   },
   it: {
     'nav.dashboard': 'Panoramica',
@@ -986,6 +996,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.closeSidebar': 'Nascondi conversazioni',
     'ai.startDictation': 'Avvia dettatura',
     'ai.stopDictation': 'Ferma dettatura',
+    'ai.attachFile': 'Allega file',
+    'ai.removeAttachment': 'Rimuovi allegato',
+    'ai.tooManyAttachments': 'Massimo 3 allegati per messaggio.',
+    'ai.attachmentTooLarge': 'Il file è troppo grande.',
+    'ai.attachmentReadFailed': 'Impossibile leggere il file.',
   },
 };
 
