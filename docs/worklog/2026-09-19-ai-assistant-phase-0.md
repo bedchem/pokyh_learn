@@ -324,6 +324,51 @@ Phase 0's already-shipped popup.
   same token, same route → `201`, purely from team membership. Confirms the
   two grant paths are genuinely independent and both enforced correctly.
 
+## Follow-up (same day) — real hardware sizing + a deployment-script bug found while doing it
+
+User provided the actual target hardware: 16GB RAM, AMD Ryzen 4300U (4
+vCPUs). Sized `OLLAMA_MEM_LIMIT=8g`/`OLLAMA_CPUS=3`/`OLLAMA_NUM_THREAD=3`
+(leaves ~8GB and 1 core for MySQL/Redis/the app/OS) and dropped
+`OLLAMA_NUM_PARALLEL` to 1 for this specific weak CPU (dedicating full
+capacity to one reply at a time is the better trade on hardware this
+modest — raise later only after confirming latency stays acceptable with
+two concurrent chats).
+
+While preparing these values, found and fixed a real deployment bug:
+`OLLAMA_MEM_LIMIT`/`OLLAMA_CPUS`/`OLLAMA_KEEP_ALIVE`/`OLLAMA_NUM_PARALLEL`/
+`OLLAMA_MAX_LOADED_MODELS`/`OLLAMA_NUM_THREAD` are Compose-level `${VAR}`
+substitutions, but `scripts/compose-stack.sh` sets
+`COMPOSE_DISABLE_ENV_FILE=1` specifically to stop Compose from
+auto-loading the project `.env` for that exact substitution mechanism (so a
+`$` inside a bcrypt hash or other secret elsewhere in that file is never
+shell-interpolated). That meant setting these six keys in `.env` silently
+had **no effect** through the repository's own documented deploy path —
+confirmed directly: `./scripts/compose-stack.sh --profile ai config` showed
+the hardcoded `10g`/`4` defaults even with `OLLAMA_MEM_LIMIT=7g`/
+`OLLAMA_CPUS=2` set in `.env`.
+
+Fixed in `scripts/compose-stack.sh`: extract just this small, non-secret set
+of keys with the same single-key `awk` pattern the `mysql` service already
+uses for its two values, and export them as real shell variables before
+invoking `docker compose` — never sourcing/exporting the whole file (which
+would reintroduce exactly the `$`-in-secrets problem
+`COMPOSE_DISABLE_ENV_FILE` exists to prevent). Re-verified with `config`:
+setting the two test values now correctly produces `cpus: 2`/
+`mem_limit: "7516192768"`, and removing them correctly falls back to the
+hardcoded `4`/`10g` defaults. Documented the mechanism and the six affected
+keys in `.env.example` and the backend `README.md`'s AI deployment section
+so a future reader isn't caught by the same silent no-op.
+
+### Verification
+
+- `./scripts/compose-stack.sh --profile ai config` re-run before and after
+  the fix, confirming the before-state (silently ignored) and after-state
+  (correctly applied) with real values, not just code inspection.
+- This is a `.sh` change, not TypeScript — no `tsc`/build step applies; the
+  existing live containers were left running on their pre-fix limits (10g/4
+  cpus) since restarting them isn't needed to validate the fix itself, which
+  is entirely about what `docker compose config` resolves.
+
 ## Release state
 
 Committed, not pushed, per the user's explicit confirmation of scope
@@ -333,9 +378,17 @@ both repos, confirmed rather than assumed):
 
 - `pokyh-backend`: `f4e1b1901b915ce9f41e300e3dd96fc9bdae2572` — "Add Phase 0
   of the self-hosted AI assistant (\"KIbo\")"; `84bb5bcae0129708fa60caf08c35f2737e9268ea`
-  — "Add team-level AI assistant access grants".
+  — "Add team-level AI assistant access grants"; `6c548725e22e6d40fbefab64f015d6ef119da7f0`
+  — "Fix Ollama resource/tuning vars being silently ignored by the deploy
+  script".
 - `pokyh_learn-frontend`: `06afdb433c1ed6ffa29decc4e9af25e0cd4b0cc3` — "Add
   Phase 0 frontend for the self-hosted AI assistant (\"KIbo\")";
   `c0b7d9848edae98ac0bc5c24234fedd66119a3b1` — "Record Phase 0 AI assistant
   commit outcome in this worklog"; `216e1cbc29547b617d6f4d15f03164883923108e`
   — "Document team-level AI assistant access grants".
+
+Pushed to the tracked remote branch on both repos per the user's explicit
+request ("push the code!!") after providing the real target hardware
+(16GB RAM, AMD Ryzen 4300U / 4 vCPUs) — same confirmed identity and commit
+scope as above, no new confirmation needed for the push-vs-commit-only
+distinction since the user's own message was the explicit push instruction.
