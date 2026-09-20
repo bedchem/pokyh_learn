@@ -16,15 +16,24 @@ function dayLabel(dayKey: string, locale: 'de' | 'en' | 'it') {
 function ActivityChart({ analytics }: { analytics: LearningAnalytics }) {
   const { locale, t } = useLearnPreferences();
   const peak = Math.max(...analytics.days.map((point) => point.answers), 1);
+  const todayKey = analytics.days.at(-1)?.dayKey;
   return (
     <figure className="activity-chart-figure" aria-labelledby="activity-chart-caption">
       <div className="activity-chart" aria-hidden="true">
-        {analytics.days.map((point) => (
-          <div className="activity-chart__column" key={point.dayKey}>
-            <span className="activity-chart__bar" style={{ height: `${(point.answers / peak) * 100}%` }} />
-            <small>{dayLabel(point.dayKey, locale)}</small>
-          </div>
-        ))}
+        {analytics.days.map((point) => {
+          const isToday = point.dayKey === todayKey;
+          const isEmpty = point.answers <= 0;
+          return (
+            <div className={`activity-chart__column${isToday ? ' activity-chart__column--today' : ''}`} key={point.dayKey}>
+              <span className="activity-chart__value">{point.answers > 0 ? point.answers : ''}</span>
+              <span
+                className={`activity-chart__bar${isEmpty ? ' activity-chart__bar--empty' : ''}`}
+                style={isEmpty ? undefined : { height: `${(point.answers / peak) * 100}%` }}
+              />
+              <small>{dayLabel(point.dayKey, locale)}</small>
+            </div>
+          );
+        })}
       </div>
       <figcaption className="sr-only" id="activity-chart-caption">{t('dashboard.activityAria')}</figcaption>
       <ol className="sr-only">

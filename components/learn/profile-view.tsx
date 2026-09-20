@@ -1,6 +1,7 @@
 'use client';
 
 import { Flame, Target, TrendingUp } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 import { useLearnPreferences } from '@/components/providers/learn-preferences';
 import type { DashboardData } from '@/lib/types';
@@ -28,7 +29,17 @@ export type YearActivityDay = { dayKey: string; answers: number; minutes: number
 
 export function ContributionHeatmap({ days, locale }: { days: YearActivityDay[]; locale: 'de' | 'en' | 'it' }) {
   const { t } = useLearnPreferences();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const maxAnswers = Math.max(...days.map((day) => day.answers), 1);
+
+  // When the grid is wider than the panel (small/tablet screens), start the
+  // horizontal scroll at the most recent week instead of the oldest one —
+  // matching what a learner actually wants to see first.
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    node.scrollLeft = node.scrollWidth;
+  }, [days]);
 
   // Pad the front so the grid always starts on the same weekday column,
   // matching GitHub's week-column layout.
@@ -57,23 +68,27 @@ export function ContributionHeatmap({ days, locale }: { days: YearActivityDay[];
 
   return (
     <div className="contribution-heatmap">
-      <div className="contribution-heatmap__months" aria-hidden="true">
-        {monthLabels.map((label, index) => <span key={index}>{label}</span>)}
-      </div>
-      <div className="contribution-heatmap__grid" role="img" aria-label={t('profile.heatmapAria')}>
-        {weeks.map((week, weekIndex) => (
-          <div className="contribution-heatmap__week" key={weekIndex}>
-            {week.map((cell, dayIndex) => cell
-              ? (
-                <span
-                  key={cell.dayKey}
-                  className={`contribution-heatmap__cell contribution-heatmap__cell--${intensityLevel(cell.answers, maxAnswers)}`}
-                  title={`${dateFormatter.format(parseDay(cell.dayKey))}: ${t('profile.heatmapTooltip', { answers: String(cell.answers), minutes: String(cell.minutes) })}`}
-                />
-              )
-              : <span className="contribution-heatmap__cell contribution-heatmap__cell--pad" key={`pad-${weekIndex}-${dayIndex}`} aria-hidden="true" />)}
+      <div className="contribution-heatmap__scroll" ref={scrollRef}>
+        <div className="contribution-heatmap__inner">
+          <div className="contribution-heatmap__months" aria-hidden="true">
+            {monthLabels.map((label, index) => <span key={index}>{label}</span>)}
           </div>
-        ))}
+          <div className="contribution-heatmap__grid" role="img" aria-label={t('profile.heatmapAria')}>
+            {weeks.map((week, weekIndex) => (
+              <div className="contribution-heatmap__week" key={weekIndex}>
+                {week.map((cell, dayIndex) => cell
+                  ? (
+                    <span
+                      key={cell.dayKey}
+                      className={`contribution-heatmap__cell contribution-heatmap__cell--${intensityLevel(cell.answers, maxAnswers)}`}
+                      title={`${dateFormatter.format(parseDay(cell.dayKey))}: ${t('profile.heatmapTooltip', { answers: String(cell.answers), minutes: String(cell.minutes) })}`}
+                    />
+                  )
+                  : <span className="contribution-heatmap__cell contribution-heatmap__cell--pad" key={`pad-${weekIndex}-${dayIndex}`} aria-hidden="true" />)}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="contribution-heatmap__legend" aria-hidden="true">
         <span>{t('profile.heatmapLess')}</span>

@@ -13,6 +13,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  UserRound,
   UsersRound,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -213,6 +214,9 @@ export function AppShell({
             </button>
             {workspaceMenuOpen && (
               <div className="workspace-menu__panel" role="menu">
+                <Link href="/profile" role="menuitem" className="workspace-menu__item" onClick={() => setWorkspaceMenuOpen(false)}>
+                  <UserRound size={16} /> {t('nav.profile')}
+                </Link>
                 <Link href="/settings" role="menuitem" className="workspace-menu__item" onClick={() => setWorkspaceMenuOpen(false)}>
                   <Settings size={16} /> {t('action.settings')}
                 </Link>
@@ -237,6 +241,9 @@ export function AppShell({
           {identity && (
             <div className="mobile-menu__footer">
               <QuickAddVocabularyButton variant="menu" onNavigate={() => setMenuOpen(false)} />
+              <Link href="/profile" className="workspace-menu__item" onClick={() => setMenuOpen(false)}>
+                <UserRound size={16} /> {t('nav.profile')}
+              </Link>
               <Link href="/settings" className="workspace-menu__item" onClick={() => setMenuOpen(false)}>
                 <Settings size={16} /> {t('action.settings')}
               </Link>
@@ -256,7 +263,8 @@ export function AppShell({
               <PreferenceControls compact />
               <QuickAddVocabularyButton variant="topbar" />
               <Link href="/create/course" className="button button--plain button--small"><GraduationCap size={16} /> {t('action.createCourse')}</Link>
-              <Link href="/settings" className="avatar-button" aria-label={t('action.settings')}><Avatar name={identity.username} size={30} /></Link>
+              <Link href="/settings" className="icon-button" aria-label={t('action.settings')}><Settings size={18} /></Link>
+              <Link href="/profile" className="avatar-button" aria-label={t('nav.profile')}><Avatar name={identity.username} size={30} /></Link>
             </div>
           </>}
         </div>
