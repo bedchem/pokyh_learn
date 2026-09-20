@@ -87,6 +87,13 @@ change as shared work. Do not delete, revert, rename, overwrite wholesale, or
   Learn administration, API-key lifecycle work, audit logging, validation,
   rate limits, Prisma models, and operational configuration examples. Do not
   alter existing Pokyh routes or any real `.env` file while working on Learn.
+- **Pokyh class assignment invariant (completed, uncommitted)**: the main
+  frontend now recognizes the `Elternaccount` tag and keeps parent Pokyh class
+  identity empty while retaining child data only inside the WebUntis session.
+  Student class resolution recovers missing ids from the matching student/app
+  data, and the backend removes stale/wrong memberships and forbids parent
+  joins. Preserve this boundary when changing authentication or class routes;
+  see the 2026-09-20 worklog entry for verification.
 - **Local integration verification (completed, uncommitted)**: the three
   services were rebuilt and exercised together on 2026-09-14. The backend now
   uses externally managed ingress rather than an in-container tunnel and
