@@ -71,4 +71,4 @@
   unrelated "parent-student-class-assignment" change was visible in
   `git status` mid-session (modified `AGENTS.md` + a same-dated worklog file)
   and was deliberately left untouched and excluded from this commit.
-- Release state: uncommitted
+- Release state: pushed `origin/main` `45b523c`
