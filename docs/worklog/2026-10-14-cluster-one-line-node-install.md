@@ -307,3 +307,145 @@
   `cluster_peers` channel columns; `cluster_installs`; replicated
   `relays`). Real-server checks listed in the verification entries remain.
 - Release state: committed `985c645`; push in progress
+
+## 2026-10-14 17:00 CEST — public /setup, hardening, leaderless blue/green updates (in progress)
+
+- Intent: Owner's request: `/setup` reachable only while a node is being
+  added; install by name with optional domain/IP (IP detected otherwise);
+  basic server hardening; automatic leaderless updates node by node without
+  downtime; "i" explanations and visible switch labels in the admin panel.
+- Outcome (uncommitted): `/setup`, `/setup/provision`, `/setup/bundle` on the
+  API port, 404 unless an install is open (also closed by the clock); install
+  key carries the panel's public origin; bootstrap verifies every public answer
+  (sealed config / hash) and falls back to the pinned channel. Installer:
+  `ufw` (SSH ports detected) + `unattended-upgrades` (`POKYH_HARDEN=0` skips).
+  Stack: `app-blue`/`app-green`, `edge` (PROXY protocol, happy-eyeballs),
+  `updater` (only Docker access; runtime files only from the install-time
+  trusted repo/branch, compose policy check), Caddy with `/readyz` health
+  checks. Backend: `src/cluster/{updates,rollout,updateSettings}.ts`, replicated
+  table `update_settings`, heartbeat update advert, build hand-over over the
+  channel, admin API `/api/admin/cluster/updates*`. Panel: Updates section,
+  InfoTip/ToggleField, new install dialog. Bundle now includes `deploy/relay`.
+- Verification: `npm test` unit suites incl. new `tests/clusterUpdates.test.mjs`
+  pass; `tests/cluster/update.e2e.mjs` 5/6 then fixed two found bugs (failure
+  re-applied after retry; state reset on first tick) — full rerun pending;
+  Docker updater test: policy passes on the real compose.yml, blue→green
+  switch works; rerun with Caddy pending at the time of writing; generated
+  Caddyfile validated by Caddy 2.8.4; panel rendered in headless Chrome
+  (no console errors, no overflow at 390 px); live branch + CI check against
+  the GitHub repository works.
+- Risk / next step: `origin/main` moved (`fe38f51`, another contributor);
+  one textual conflict expected in `admin/src/api.ts` when committing.
+  Still to run: full `npm run test:cluster` (install e2e rewritten),
+  `npm run test:updater`. Not testable here: real VPS install, ufw on a real
+  host, Let's Encrypt, the owner's proxy.
+- Release state: superseded by the entries below
+
+## 2026-10-14 18:00 CEST — local commit and merge of the upstream work
+
+- Intent: The owner asked to pull, merge everything and push at the end,
+  with the confirmed identity and scope (pokyh-backend and this worklog; no
+  AI trailer or co-author).
+- Outcome: Local commit `0eb114c` (public `/setup`, hardening, leaderless
+  blue/green updates) under the confirmed identity. `origin/main` had moved
+  by two commits of another contributor (analytics, privacy consent, usage
+  statistics); merged with a merge commit `0d54084` (no rebase, nothing of
+  theirs rewritten). One conflict in `admin/src/api.ts` (both sides appended
+  API calls and type imports) resolved by keeping both. No open pull
+  requests in either repository.
+- Affected areas: `pokyh-backend` (`main`, local).
+- Verification: The merge commit, checked out alone in a temporary worktree:
+  backend type check clean, admin type check clean, `npm test` 121 of 121
+  (including the contributor's new tests).
+- Risk / next step: Pushed together with the work below once the whole
+  suite passes.
+- Release state: committed locally, not pushed
+
+## 2026-10-14 20:00 CEST — targeted popups, Learn scope, web-proxy way, install web access, README
+
+- Intent: Owner's requests: popups shown only to chosen users and/or classes
+  (several of each); choose whether Pokyh Learn is part of the cluster;
+  several configurable and switchable ways through the owner's proxy,
+  including the API's own public port with an internal cluster entry behind
+  the proxy; nothing hard-coded; a complete README without personal data.
+- Outcome (backend `pokyh-backend`):
+  - Popups: replicated tables `popup_target_users` and
+    `popup_target_classes`; admin API accepts `targetUsers`/`targetClasses`
+    (checked to exist) and offers `/api/admin/popups/targets`; the client
+    feed reads the caller's own session (`optionalAuth`) and never returns a
+    targeted popup without a matching session; targeted popups are stored as
+    signed-in only. Panel: recipient picker (class chips, user search).
+  - Learn scope: every `learn_*` table stays captured; what is exchanged,
+    compared and fingerprinted follows a cluster-wide setting carried in the
+    heartbeat (newest wins, ties settled by node id), stored in
+    `cluster_node`; switching back on starts a complete transfer to merge
+    (newer row wins); Learn deletions are kept while not exchanged.
+    `CLUSTER_REPLICATE_LEARN` (shared). Panel section "Was wird abgeglichen".
+  - Ways: new kind "proxy-path" (`CLUSTER_PATH_ENDPOINTS` or panel), off by
+    default, used only when every pinned way fails; a node accepts such
+    sessions only while it offers such a way and closes them when it stops;
+    ready-made nginx/HAProxy/Traefik/Caddy configuration sized from the
+    cluster's message limit and timeouts; "Weg testen" for every way
+    (certificate pin, or a challenge keyed per process).
+    `CLUSTER_CHANNEL_RETRY_SECONDS`, `CLUSTER_RELAY_DEFAULT_PORT`.
+  - Installer: web access none / own domain / behind the owner's proxy
+    (`gateway` service, plain HTTP on a chosen port and address, the proxy's
+    addresses trusted for the client address); cluster port, bind address
+    and allowed sources chosen per install; firewall rules follow them.
+  - Personal data: the built-in default menu source URL (a personal domain)
+    removed from code, panel and `.env.example` (now configuration only; the
+    owner's environment sets it); an example first name in `COMMANDS.md`
+    replaced. `LICENSE` names the copyright holder by a handle and was left
+    as it is.
+  - README rewritten (structure, all current features, settings, tests);
+    `.env.example` and `COMMANDS.md` updated.
+- Affected areas: `src/cluster/*` (scope, scopeRules, installOptions,
+  waytest, reach, transport, catalog, capture, endpoints, proxySnippets,
+  provision, index, router), `src/routes/{popups,adminCluster,admin}.ts`,
+  `src/config.ts`, `prisma/schema.prisma` (additive), `deploy/node/*`,
+  `admin/src/*`, tests, docs.
+- Verification: see the next entry.
+- Release state: see the next entry
+
+## 2026-10-14 21:30 CEST — verification, commit and push
+
+- Intent: Verify the merged tree with all new work, then commit and push both
+  repositories with the confirmed identity (no trailer, no co-author).
+- Outcome: All checks below pass. Found and fixed on the way: the "test this
+  way" challenge was keyed with a cluster-wide secret, so another node could
+  have answered it (now a random key per process); a node that stops offering
+  its web-proxy way now closes the sessions opened on it at once; test-only
+  fixes (a race reading a restarting node's id, a helper server without an
+  error handler, port expectations that assumed 4100).
+- Affected areas: `pokyh-backend` (`main`), this worklog.
+- Verification:
+  - `npx prisma validate`, backend and admin type checks, `shellcheck` on
+    both installers, admin production build: clean.
+  - `npm test`: 130 of 130 (new: replication scope rules and catalog
+    restriction, path ways and their proxy configuration, install options,
+    gateway Caddyfile and compose settings, updater policy for the gateway,
+    edge racing). The edge test was repeated ten times without a failure.
+  - `npm run test:cluster`: 70 of 70 — `e2e`, `update` (6) and `features`
+    (6) in the complete run; `install` (20, one new) and `relay` (9) in a
+    rerun after correcting three test expectations. New coverage: targeted
+    popups on two nodes, Learn left out and merged back in, "Weg testen",
+    the web-proxy way carrying a locked link with nothing readable on it and
+    refused once no longer offered, installs behind the owner's proxy.
+  - `npm run test:updater`: 6 of 6 against real Docker (Caddy validates
+    both generated Caddyfiles; blue/green switch without a failed HTTPS
+    request; unhealthy version removed; rollback; tampered build refused).
+  - Admin panel rendered in headless Chrome: cluster page sections, install
+    dialog "behind my proxy", popup recipients; no console errors, no
+    horizontal overflow at 390 px. Live branch/CI check against the GitHub
+    repository works.
+  - The pending diff contains no secrets or personal data (only removals of
+    the personal default URL and example name).
+- Risk / next step: Not verifiable here: a real VPS install, `ufw` on a real
+  host, Let's Encrypt, the owner's proxy configuration for the API-path way.
+  The production node runs the previous version; after deploying, the new
+  tables and columns are added additively (`popup_target_*`,
+  `cluster_node.scope_*`, `cluster_peers.path_ways`,
+  `cluster_installs.options`). The deployment must set `MENSA_IMPORT_URL`
+  (the owner's environment already does). Learn data stays exchanged unless
+  switched off.
+- Release state: committed and pushed (see the commit list of `main`)
